@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&family=Roboto:wght@300;400;500;700;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+  --font-poppins: "Poppins", ui-sans-serif, system-ui, sans-serif;
+
+  --color-prosumia-red-dark: #B40000;
+  --color-prosumia-red: #E9121C;
+  --color-prosumia-red-light: #F7444C;
+  --color-prosumia-red-lighter: #FD787D;
+  
+  --color-prosumia-yellow-dark: #E99000;
+  --color-prosumia-yellow: #FAAA00;
+  --color-prosumia-yellow-light: #FCB941;
+  --color-prosumia-yellow-lighter: #FFC968;
+  
+  --color-prosumia-green-dark: #008233;
+  --color-prosumia-green: #0EA75D;
+  --color-prosumia-green-light: #45C678;
+  --color-prosumia-green-lighter: #85D09C;
+
+  --color-prosumia-dark: #212121;
+  --color-prosumia-gray: #3C3C3C;
+  --color-prosumia-gray-light: #E4E4E4;
+  --color-prosumia-gray-lighter: #F5F5F5;
+}
