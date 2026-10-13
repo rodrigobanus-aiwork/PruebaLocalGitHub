@@ -1,0 +1,52 @@
+name: Prosumia 2.0 - Vista previa aislada
+on:
+  push:
+    branches: [prosumia-v2]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar Prosumia 1.0 estable
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: stable
+      - name: Descargar Prosumia 2.0 experimental
+        uses: actions/checkout@v4
+        with:
+          ref: prosumia-v2
+          path: experimental
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compilar 1.0 para ruta principal
+        working-directory: stable
+        run: |
+          npm install --no-audit --no-fund
+          npx vite build --outDir ../site --emptyOutDir
+      - name: Compilar 2.0 para /v2/
+        working-directory: experimental
+        run: |
+          npm install --no-audit --no-fund
+          npx vite build --outDir ../site/v2 --emptyOutDir
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
