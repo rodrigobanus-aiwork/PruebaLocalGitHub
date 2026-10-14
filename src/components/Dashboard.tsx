@@ -977,17 +977,28 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
       setSeriesInitialized(true);
     }
   }, [seriesInitialized, availableSeries, selectedGovs]);
-  // Modo clásico: recupera el comportamiento original de selección por fotografías/escudos
-  // y botones de redes del encabezado. El modo personalizado no modifica esos filtros.
+  // En Clásico se calculan TODAS las cuentas de las redes activas, igual que en 1.0.
+  // Las fotografías/escudos sólo DESTACAN las líneas; nunca eliminan las restantes.
+  // En Personalizado sí se muestran exclusivamente las combinaciones elegidas.
   const activeSeries = useMemo(() => {
-    if (selectionMode === "personalizado") return selectedSeries.filter(k => availableSeries.includes(k));
+    if (selectionMode === "personalizado") {
+      return selectedSeries.filter(k => availableSeries.includes(k));
+    }
     return availableSeries.filter(key => {
       const match = key.match(/^(.*) \((FB|IG|TW|TIK TOK|YT)\)$/);
-      if (!match) return false;
-      const [, account, network] = match;
-      return socials.includes(network) && (selectedGovs.length === 0 || selectedGovs.includes(account));
+      return !!match && socials.includes(match[2]);
     });
-  }, [selectionMode, selectedSeries, availableSeries, socials, selectedGovs]);
+  }, [selectionMode, selectedSeries, availableSeries, socials]);
+
+  const hasClassicHighlight = selectionMode === "clasico" && selectedGovs.length > 0;
+  const getOriginalNetworkColor = (net: string) => {
+    if (net === "FB") return "#1877F2";
+    if (net === "IG") return "#c13584";
+    if (net === "TW") return "#000000";
+    if (net === "TIK TOK") return "#FE2C55";
+    if (net === "YT") return "#E62117";
+    return "#041527";
+  };
   const toggleSeries = (key: string) => setSelectedSeries(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   const colorForSeries = (account: string, net: string) => {
     const palettes: Record<string,string[]> = {
@@ -1255,11 +1266,11 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
       const assignRank = (sortedArray: any[], isGobType: boolean) => {
          const entityLabel = isGobType ? 'gobiernos' : 'gobernadores';
          sortedArray.forEach((item: any, index: number) => {
-            const isSelected = activeSeries.includes(item.key);
+            const isSelected = selectionMode === "personalizado" || selectedGovs.includes(item.gov);
             if (isSelected) {
                row[`${item.key}_extra`] += `\nPosición: #${index + 1} de ${sortedArray.length} ${entityLabel}`;
             } else {
-               delete row[item.key];
+               // Clásico: conservar serie de fondo y no mostrar detalle de ranking.
                delete row[`${item.key}_extra`];
             }
          });
@@ -1270,14 +1281,14 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
 
       return row;
     });
-  }, [activeGroupedPeriods, data, activeSeries, govs, metric, granularity]);
+  }, [activeGroupedPeriods, data, activeSeries, govs, metric, granularity, selectionMode, selectedGovs]);
 
   const colors = ["#e60026", "#041527", "#1CB86D", "#FF9F1C", "#2EC4B6", "#E71D36", "#011627", "#8338EC", "#3A86FF", "#FF006E", "#8A94A5", "#F15BB5", "#9B5DE5", "#00F5D4", "#FEE440"];
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-prosumia-gray-light p-6 md:p-8 mt-8">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-        <h2 className="text-xl font-poppins font-bold text-prosumia-dark mr-4">Evolución por cuenta y red</h2>
+        <h2 className="text-xl font-poppins font-bold text-prosumia-dark mr-4">{selectionMode === "clasico" ? `Evolución en ${socials.join(", ")}` : "Evolución por cuenta y red"}</h2>
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-prosumia-gray">Temporalidad:</span>
@@ -1406,7 +1417,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
               tickFormatter={(val) => new Intl.NumberFormat("es-AR", { notation: "compact" }).format(val)} 
               dx={-10}
             />
-            <RechartsTooltip content={<CustomTooltip selectedGovs={[]} metric={metric} />} />
+            <RechartsTooltip content={<CustomTooltip selectedGovs={selectionMode === "clasico" ? selectedGovs : activeSeries} metric={metric} />} />
             <Legend wrapperStyle={{ paddingTop: "20px" }} />
             {activeSeries.map(key => {
                 const match = key.match(/^(.*) \((FB|IG|TW|TIK TOK|YT)\)$/);
@@ -1414,10 +1425,10 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
               })
               .map(({ gov, net }, i: number) => {
               const rowKey = seriesKey(gov, net);
-              const isSelected = true;
-              const isDimmed = false;
+              const isSelected = selectionMode === "personalizado" || selectedGovs.includes(gov);
+              const isDimmed = hasClassicHighlight && !selectedGovs.includes(gov);
               
-              const lineColor = colorForSeries(gov, net);
+              const lineColor = selectionMode === "personalizado" ? colorForSeries(gov, net) : getOriginalNetworkColor(net);
               const CustomLabel = (props: any) => {
                 const { x, y, index } = props;
                 if (index === chartData.length - 1 && chartData[index][rowKey] !== undefined) { // End of line
@@ -1426,9 +1437,9 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
                   return (
                     <g>
                       <image href={image} x={x + 10} y={y - 12} height="24px" width="24px" clipPath={info.isGobierno ? undefined : "url(#circleClip)"} preserveAspectRatio={info.isGobierno ? "xMidYMid meet" : "xMidYMid slice"} />
-                      {
+                      {(selectionMode === "personalizado" || socials.length > 1) && (
                          <text x={x + 38} y={y + 4} fontSize="10" fontWeight="bold" fill={lineColor}>{net}</text>
-                      }
+                      )}
                     </g>
                   );
                 }
@@ -1445,7 +1456,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
                     dot={isSelected ? { r: 5, fill: lineColor, strokeWidth: 2, stroke: "#fff" } : { r: 0 }}
                     activeDot={{ r: 6, strokeWidth: 0 }}
                     opacity={isDimmed ? 0.15 : 1}
-                    label={<CustomLabel />}
+                    label={isDimmed ? false : <CustomLabel />}
                     isAnimationActive={false}
                   />
               );
@@ -1483,4 +1494,5 @@ export function getTrafficLightColor(rankIndex: number, totalCount: number) {
   if (totalCount > 6 && rankIndex >= totalCount - 12) return "bg-prosumia-red";
   return "bg-prosumia-yellow";
 }
+
 
