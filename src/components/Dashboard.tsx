@@ -88,6 +88,9 @@ export default function Dashboard() {
   const [data, setData] = useState<DataRow[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Universo de análisis. Los módulos nuevos son maquetas sin datos.
+  const [universe, setUniverse] = useState<"gobernadores" | "dirigentes" | "medios" | "comparador">("gobernadores");
+
   // Tabs
   const [activeTab, setActiveTab] = useState<"ranking" | "lectura" | "evolutivo" | "comparacion">("ranking");
   
@@ -341,7 +344,7 @@ export default function Dashboard() {
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Analytics Logo" className="w-11 h-11 object-contain shrink-0 rounded-xl shadow-sm" />
               <div>
                 <h1 className="font-poppins text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-prosumia-dark to-prosumia-gray tracking-tight leading-none">
-                  Ranking de Gobernadores 
+                  {universe === "gobernadores" ? "Ranking de Gobernadores" : universe === "dirigentes" ? "Dirigentes" : universe === "medios" ? "Medios" : "Comparador"}
                 </h1>
                 <span className="text-[10px] uppercase font-bold text-prosumia-gray/70 tracking-widest block mt-0.5 mb-1.5">powered by analytics</span>
                 <div className="flex items-center gap-3 text-xs text-prosumia-gray font-medium font-sans">
@@ -355,7 +358,7 @@ export default function Dashboard() {
             </div>
 
             {/* View Tabs */}
-            <div className="hidden md:flex bg-prosumia-gray-lighter p-1 rounded-lg ml-4">
+            {universe === "gobernadores" && <div className="hidden md:flex bg-prosumia-gray-lighter p-1 rounded-lg ml-4">
               <button 
                 onClick={() => setActiveTab("ranking")}
                 className={cn("flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold font-sans transition-all duration-200", activeTab === "ranking" ? "bg-white text-prosumia-dark shadow-sm ring-1 ring-black/5" : "text-prosumia-gray hover:text-prosumia-dark")}
@@ -380,10 +383,10 @@ export default function Dashboard() {
               >
                 <LayoutDashboard className="w-4 h-4" /> Comparación
               </button>
-            </div>
+            </div>}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 md:gap-4">
+          {universe === "gobernadores" && <div className="flex flex-wrap items-center gap-3 md:gap-4">
             {(activeTab === "ranking" || activeTab === "comparacion") && (
               <div className="flex bg-white/50 backdrop-blur-md p-1.5 rounded-full border border-prosumia-gray-light/60 shadow-sm gap-1">
                  {(["Gobernadores", "Gobiernos", "Ambos"] as const).map(t => (
@@ -489,13 +492,30 @@ export default function Dashboard() {
               <span>Exportar</span>
             </button>
 
-          </div>
+          </div>}
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-[1600px] mx-auto px-6 mt-8 relative min-h-[60vh]">
-        
+        <div className="flex flex-wrap gap-2 mb-7 border-b border-prosumia-gray-light pb-5" aria-label="Universos de análisis">
+          {([
+            {id: "gobernadores", text: "Gobernadores", sub: "Provinciales"},
+            {id: "dirigentes", text: "Dirigentes", sub: "Personas públicas"},
+            {id: "medios", text: "Medios", sub: "Cuentas digitales"},
+            {id: "comparador", text: "Comparador", sub: "Entre universos"}
+          ] as const).map(item => (
+            <button key={item.id} type="button" onClick={() => setUniverse(item.id)}
+              className={cn("flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all border min-w-[175px]",
+                universe === item.id ? "bg-prosumia-dark text-white border-prosumia-dark shadow-md" : "bg-white text-prosumia-dark border-prosumia-gray-light hover:border-prosumia-dark/30 hover:shadow-sm")}>
+              <span className={cn("w-2 h-2 rounded-full", universe === item.id ? "bg-prosumia-red" : "bg-prosumia-gray-light")}/>
+              <span className="flex flex-col leading-tight"><span className="font-poppins font-bold text-sm">{item.text}</span>
+              <span className={cn("text-[10px] mt-1", universe === item.id ? "text-white/65" : "text-prosumia-gray")}>{item.sub}</span></span>
+            </button>
+          ))}
+        </div>
+        {universe !== "gobernadores" && <ProsumiaModulePreview universe={universe} />}
+        {universe === "gobernadores" && <>
         {/* Governor Highlight Selector */}
         {visibleGovernors.length > 0 && (
           <div className="mb-8 overflow-x-auto pb-6 scrollbar-hide flex flex-col gap-3">
@@ -773,6 +793,7 @@ export default function Dashboard() {
             typeFilter={typeFilter}
           />
         ) : null}
+        </>}
       </main>
 
       {/* Modal de Exportación HTML y Datos */}
@@ -1561,6 +1582,67 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
 
 
 
+
+/** Maqueta de estructura futura: no calcula ni simula estadísticas. */
+function ProsumiaModulePreview({ universe }: {universe: "dirigentes" | "medios" | "comparador"}) {
+  const [view, setView] = useState<"ranking" | "lectura" | "evolutivo" | "comparacion">("ranking");
+  const [filter, setFilter] = useState("Todas las categorías");
+  const [network, setNetwork] = useState("FB");
+  const [chosen, setChosen] = useState<string[]>([]);
+  const isCross = universe === "comparador";
+  const heading = universe === "dirigentes" ? "Dirigentes" : universe === "medios" ? "Medios digitales" : "Comparador transversal";
+  const categories = universe === "dirigentes" ? ["Todas las categorías", "Intendentes", "Ministros", "Legisladores", "Otros dirigentes"] : ["Todas las categorías", "Medios provinciales", "Medios locales", "Periodistas", "Otros medios"];
+  const cards = [
+    {name: "Seguidores", sub: "Valores absolutos", icon: <Users className="w-4 h-4"/>},
+    {name: "Penetración", sub: "% sobre universo de referencia", icon: <Activity className="w-4 h-4"/>},
+    {name: "Publicaciones", sub: "Volumen de posteos", icon: <FileText className="w-4 h-4"/>},
+    {name: "Engagement / Post", sub: "Interacciones por publicación", icon: <TrendingUpIcon className="w-4 h-4"/>},
+    {name: "Impacto", sub: "Indicador configurable", icon: <BarChart2 className="w-4 h-4"/>}
+  ];
+  const titleByView = {ranking: "Ranking de perfiles", lectura: "Lectura por perfil", evolutivo: "Evolución de métricas", comparacion: "Comparación dentro del universo"};
+  return (
+    <section className="space-y-6 pb-12">
+      <div className="flex flex-wrap justify-between items-start gap-3">
+        <div>
+          <div className="text-[10px] uppercase font-bold tracking-widest text-prosumia-red mb-2">Arquitectura Prosumia · Vista de diseño</div>
+          <h2 className="text-2xl font-poppins font-bold text-prosumia-dark">{heading}</h2>
+          <p className="text-prosumia-gray text-sm mt-1">{isCross ? "Comparar perfiles de distintos universos, plataformas y períodos." : "Misma lógica visual que Gobernadores, preparada para incorporar nuevas entidades."}</p>
+        </div>
+        <span className="rounded-full px-3 py-1.5 text-xs font-bold bg-prosumia-gray-lighter border border-prosumia-gray-light text-prosumia-gray">Maqueta · Sin datos cargados</span>
+      </div>
+      {!isCross && <div className="flex flex-wrap gap-2 items-center justify-between bg-prosumia-gray-lighter rounded-2xl p-3">
+        <div className="flex flex-wrap gap-1 bg-white/60 p-1 rounded-xl">
+          {(["ranking", "lectura", "evolutivo", "comparacion"] as const).map(v => <button key={v} type="button" onClick={() => setView(v)}
+            className={cn("rounded-lg px-3 py-2 text-xs font-bold transition", view===v ? "bg-white shadow-sm text-prosumia-dark" : "text-prosumia-gray hover:text-prosumia-dark")}>{v === "comparacion" ? "Comparación" : v[0].toUpperCase()+v.slice(1)}</button>)}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select aria-label="Categoría" className="rounded-xl border border-prosumia-gray-light bg-white px-3 py-2 text-xs font-semibold" value={filter} onChange={e=>setFilter(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select>
+          <select aria-label="Red social" className="rounded-xl border border-prosumia-gray-light bg-white px-3 py-2 text-xs font-semibold" value={network} onChange={e=>setNetwork(e.target.value)}><option value="FB">Facebook</option><option value="IG">Instagram</option><option value="TIK TOK">TikTok</option><option value="TW">X</option></select>
+        </div>
+      </div>}
+      {isCross ? <>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(["Gobernadores y gobiernos", "Dirigentes", "Medios digitales"] as const).map(c => <button key={c} type="button" onClick={()=>setChosen(p=>p.includes(c)?p.filter(x=>x!==c):[...p,c])}
+            className={cn("text-left px-5 py-4 rounded-2xl border transition-all", chosen.includes(c) ? "border-prosumia-dark bg-prosumia-gray-lighter" : "border-prosumia-gray-light bg-white hover:border-prosumia-gray")}>
+            <div className="flex items-center gap-3"><span className={cn("rounded-md w-5 h-5 border flex items-center justify-center text-xs",chosen.includes(c)?"bg-prosumia-dark text-white":"bg-white")}>{chosen.includes(c)?"✓":""}</span><span className="font-semibold text-sm">{c}</span></div>
+            <p className="text-xs text-prosumia-gray mt-2 pl-8">{c === "Gobernadores y gobiernos" ? "Universo existente" : "Pendiente de incorporación de datos"}</p>
+          </button>)}
+        </div>
+        <div className="rounded-2xl border border-prosumia-gray-light bg-white p-6">
+          <div className="flex flex-wrap justify-between gap-2"><h3 className="font-poppins font-bold">Área de comparación entre universos</h3><span className="text-xs text-prosumia-gray">{chosen.length} universos seleccionados</span></div>
+          <div className="border-2 border-dashed border-prosumia-gray-light rounded-xl mt-5 min-h-[230px] flex flex-col items-center justify-center gap-3 text-center px-6 bg-prosumia-gray-lighter/20"><BarChart2 className="w-9 h-9 text-prosumia-gray/40"/><p className="font-semibold text-prosumia-dark">Comparación transversal</p><p className="text-prosumia-gray text-xs max-w-lg">Acá se ubicarán las series elegidas con métricas y períodos homologados. No se muestran resultados hasta incorporar los datos y validar comparabilidad.</p></div>
+        </div>
+      </> : <>
+        {view === "ranking" ? <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">{cards.map((c,i)=><div key={i} className="bg-white rounded-2xl border border-prosumia-gray-light overflow-hidden shadow-sm"><div className="p-4 bg-prosumia-gray-lighter/30 border-b border-prosumia-gray-light"><div className="flex items-center gap-2 font-poppins font-bold text-sm"><span className="bg-prosumia-gray-lighter p-2 rounded-lg">{c.icon}</span>{c.name}</div><p className="text-[11px] text-prosumia-gray mt-2">{c.sub}</p></div><div className="p-4 space-y-5">{[1,2,3,4].map(j=><div key={j} className="flex items-center gap-2"><span className="text-xs text-prosumia-gray">{j}</span><div className="rounded-full bg-prosumia-gray-lighter w-7 h-7 flex-shrink-0"/><div className="flex-1"><div className="h-2 rounded-full bg-prosumia-gray-light/70 w-3/4"/><div className="h-1.5 rounded-full bg-prosumia-gray-lighter w-full mt-2"/></div></div>)}</div></div>)}</div> : <div className="rounded-2xl bg-white border border-prosumia-gray-light p-5 md:p-8 shadow-sm">
+          <h3 className="font-poppins font-bold text-lg">{titleByView[view]}</h3><p className="text-xs text-prosumia-gray mt-1">Estructura de la vista: sin registros ni valores simulados.</p>
+          {view === "lectura" ? <div className="grid sm:grid-cols-3 gap-3 mt-5">{["Información del perfil", "Indicadores", "Variación por período"].map(t=><div key={t} className="bg-prosumia-gray-lighter/30 rounded-xl border border-dashed border-prosumia-gray-light p-8 text-center text-sm text-prosumia-gray">{t}<p className="text-[11px] mt-2">Sin datos</p></div>)}</div> : <div className="mt-6 min-h-[280px] border-2 border-dashed border-prosumia-gray-light rounded-xl flex items-center justify-center bg-prosumia-gray-lighter/20"><div className="text-center text-prosumia-gray"><TrendingUpIcon className="w-9 h-9 mx-auto mb-3 opacity-40"/><p className="font-semibold text-sm">Área del gráfico</p><p className="text-xs mt-1">Selección de perfiles y períodos pendiente</p></div></div>}
+        </div>}
+        <p className="text-xs text-prosumia-gray">Esta sección es una maqueta de navegación. Los controles cambian la vista y los filtros de presentación, pero no consultan datos inexistentes.</p>
+      </>}
+    </section>
+  );
+}
+
 export function RankingCard({ title, subtitle, icon, children, colorClass }: any) {
   return (
     <div className="flex flex-col bg-white rounded-2xl border border-prosumia-gray-light shadow-sm hover:shadow-md transition-shadow">
@@ -1585,4 +1667,5 @@ export function getTrafficLightColor(rankIndex: number, totalCount: number) {
   if (totalCount > 6 && rankIndex >= totalCount - 12) return "bg-prosumia-red";
   return "bg-prosumia-yellow";
 }
+
 
