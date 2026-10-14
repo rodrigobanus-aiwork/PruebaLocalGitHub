@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import Papa from "papaparse";
 import { DataRow, fetchAndParseData, GOBERNADORES_INFO } from "../lib/data";
 import { cn } from "../lib/utils";
 import { Facebook, Instagram, Twitter, MapPin, Calendar, TrendingUp, TrendingDown, Users, Activity, BarChart2, FileText, LayoutDashboard, MessageCircle as MessageCircleIcon, TrendingUp as TrendingUpIcon, Download, X, FileCode, CheckCircle2, Loader2, Sparkles, HelpCircle, HardDrive } from "lucide-react";
@@ -6,6 +7,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { LecturaView } from './LecturaView';
 import { ComparacionView } from './ComparacionView';
 import { Database } from "lucide-react";
+import EntityModule from "./EntityModule";
 
 const GOV_ORDER = [
   "M. Pullaro",
@@ -89,7 +91,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   
   // Universo de análisis. Los módulos nuevos son maquetas sin datos.
-  const [universe, setUniverse] = useState<"gobernadores" | "dirigentes" | "medios" | "comparador">("gobernadores");
+  const [universe, setUniverse] = useState<string>("gobernadores");
 
   // Tabs
   const [activeTab, setActiveTab] = useState<"ranking" | "lectura" | "evolutivo" | "comparacion">("ranking");
@@ -344,7 +346,7 @@ export default function Dashboard() {
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Analytics Logo" className="w-11 h-11 object-contain shrink-0 rounded-xl shadow-sm" />
               <div>
                 <h1 className="font-poppins text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-prosumia-dark to-prosumia-gray tracking-tight leading-none">
-                  {universe === "gobernadores" ? "Ranking de Gobernadores" : universe === "dirigentes" ? "Dirigentes" : universe === "medios" ? "Medios" : "Comparador"}
+                  {universe === "gobernadores" ? "Ranking de Gobernadores" : universe === "comparador" ? "Comparador general" : universe}
                 </h1>
                 <span className="text-[10px] uppercase font-bold text-prosumia-gray/70 tracking-widest block mt-0.5 mb-1.5">powered by analytics</span>
                 <div className="flex items-center gap-3 text-xs text-prosumia-gray font-medium font-sans">
@@ -501,9 +503,13 @@ export default function Dashboard() {
         <div className="flex flex-wrap gap-2 mb-7 border-b border-prosumia-gray-light pb-5" aria-label="Universos de análisis">
           {([
             {id: "gobernadores", text: "Gobernadores", sub: "Provinciales"},
-            {id: "dirigentes", text: "Dirigentes", sub: "Personas públicas"},
-            {id: "medios", text: "Medios", sub: "Cuentas digitales"},
-            {id: "comparador", text: "Comparador", sub: "Entre universos"}
+            {id: "Intendente", text: "Intendente", sub: "Gobiernos locales"},
+            {id: "Municipio", text: "Municipio", sub: "Institucionales"},
+            {id: "Ministro provincial", text: "Ministro provincial", sub: "Personas"},
+            {id: "Ministerio provincial", text: "Ministerio provincial", sub: "Institucionales"},
+            {id: "Detractor", text: "Detractor", sub: "Cuentas monitoreadas"},
+            {id: "Figuras nacionales", text: "Figuras nacionales", sub: "Perfiles nacionales"},
+            {id: "comparador", text: "Comparador", sub: "Entre categorías"}
           ] as const).map(item => (
             <button key={item.id} type="button" onClick={() => setUniverse(item.id)}
               className={cn("flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all border min-w-[175px]",
@@ -514,7 +520,7 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-        {universe !== "gobernadores" && <ProsumiaModulePreview universe={universe} />}
+        {universe !== "gobernadores" && <EntityModule universe={universe} />}
         {universe === "gobernadores" && <>
         {/* Governor Highlight Selector */}
         {visibleGovernors.length > 0 && (
@@ -1583,65 +1589,195 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
 
 
 
-/** Maqueta de estructura futura: no calcula ni simula estadísticas. */
-function ProsumiaModulePreview({ universe }: {universe: "dirigentes" | "medios" | "comparador"}) {
-  const [view, setView] = useState<"ranking" | "lectura" | "evolutivo" | "comparacion">("ranking");
-  const [filter, setFilter] = useState("Todas las categorías");
-  const [network, setNetwork] = useState("FB");
-  const [chosen, setChosen] = useState<string[]>([]);
-  const isCross = universe === "comparador";
-  const heading = universe === "dirigentes" ? "Dirigentes" : universe === "medios" ? "Medios digitales" : "Comparador transversal";
-  const categories = universe === "dirigentes" ? ["Todas las categorías", "Intendentes", "Ministros", "Legisladores", "Otros dirigentes"] : ["Todas las categorías", "Medios provinciales", "Medios locales", "Periodistas", "Otros medios"];
-  const cards = [
-    {name: "Seguidores", sub: "Valores absolutos", icon: <Users className="w-4 h-4"/>},
-    {name: "Penetración", sub: "% sobre universo de referencia", icon: <Activity className="w-4 h-4"/>},
-    {name: "Publicaciones", sub: "Volumen de posteos", icon: <FileText className="w-4 h-4"/>},
-    {name: "Engagement / Post", sub: "Interacciones por publicación", icon: <TrendingUpIcon className="w-4 h-4"/>},
-    {name: "Impacto", sub: "Indicador configurable", icon: <BarChart2 className="w-4 h-4"/>}
-  ];
-  const titleByView = {ranking: "Ranking de perfiles", lectura: "Lectura por perfil", evolutivo: "Evolución de métricas", comparacion: "Comparación dentro del universo"};
-  return (
-    <section className="space-y-6 pb-12">
-      <div className="flex flex-wrap justify-between items-start gap-3">
-        <div>
-          <div className="text-[10px] uppercase font-bold tracking-widest text-prosumia-red mb-2">Arquitectura Prosumia · Vista de diseño</div>
-          <h2 className="text-2xl font-poppins font-bold text-prosumia-dark">{heading}</h2>
-          <p className="text-prosumia-gray text-sm mt-1">{isCross ? "Comparar perfiles de distintos universos, plataformas y períodos." : "Misma lógica visual que Gobernadores, preparada para incorporar nuevas entidades."}</p>
+/** V4: módulo funcional para las categorías originales de la nueva base.
+ * La pantalla de Gobernadores y sus cuatro vistas permanecen intactas.
+ * Este bloque reemplaza únicamente la maqueta ProsumiaModulePreview.
+ */
+type NuevaMetrica = {anio:number;mes:number;mesNombre:string;red:string;entidad:string;metrica:string;valor:number;provincia:string;categoria:string};
+const V4_CATEGORIES = ["Intendente", "Municipio", "Ministro provincial", "Ministerio provincial", "Detractor", "Figuras nacionales"];
+const V4_NETWORKS = ["FB", "IG", "TIK TOK", "TW", "YT"];
+const V4_METRICS = ["Fans", "Publicaciones", "Reacciones", "Comentarios", "Interacciones", "Visualizaciones", "Crecimiento seguidores"];
+const v4Net = (x:string) => ({TT:"TIK TOK",TK:"TIK TOK",X:"TW"} as Record<string,string>)[x.trim().toUpperCase()] || x.trim().toUpperCase();
+const v4Metric = (x:string) => x.trim().replace(/^Crecimiento de seguidores$/i,"Crecimiento seguidores");
+const v4Label = (x:string) => ({Fans:"Seguidores",TW:"X", "TIK TOK":"TikTok", "Crecimiento seguidores":"Crecimiento de seguidores"} as Record<string,string>)[x] || x;
+const v4Format = (v:number) => new Intl.NumberFormat("es-AR", {maximumFractionDigits:1}).format(v);
+const v4Month = (r:NuevaMetrica) => r.anio * 12 + r.mes;
+const v4Id = (r:NuevaMetrica) => `${r.entidad}|||${r.red}|||${r.categoria}`;
+const v4Stock = (m:string) => m === "Fans";
+const V4_RENAMES: Record<string,string> = {
+  "362noticias": "362 Noticias", "362Noticias": "362 Noticias",
+  "Gustavo_Saadi": "Gustavo Saadi", "chacotv": "CHACO TV", "Chaco TV": "CHACO TV"
+};
+
+function ProsumiaEntityModule({universe,legacyData}:{universe:string;legacyData:DataRow[]}) {
+  const [all,setAll] = useState<NuevaMetrica[]>([]);
+  const [error,setError] = useState("");
+  const [vista,setVista] = useState<"ranking"|"lectura"|"evolutivo"|"comparacion">("ranking");
+  const [categoria,setCategoria] = useState("Todas las categorías");
+  const [provincia,setProvincia] = useState("Todas las provincias");
+  const [red,setRed] = useState("FB");
+  const [periodo,setPeriodo] = useState("ultimo");
+  const [busqueda,setBusqueda] = useState("");
+  const [metrica,setMetrica] = useState("Fans");
+  const [seleccion,setSeleccion] = useState<string[]>([]);
+  const [desde,setDesde] = useState("");
+  const [hasta,setHasta] = useState("");
+  const [temporalidad,setTemporalidad] = useState<"mensual"|"trimestral"|"semestral"|"anual">("mensual");
+  const [calc,setCalc] = useState<"total"|"promedio">("total");
+  const [historico,setHistorico] = useState(false);
+  const [rankMetricas,setRankMetricas] = useState<string[]>(["Fans","Publicaciones","Reacciones","Comentarios","Interacciones"]);
+
+  useEffect(()=>{
+    const read=(csv:string)=>{
+      const parsed = Papa.parse<Record<string,string>>(csv.replace(/^\uFEFF/,""), {header:true,skipEmptyLines:true,delimiter:";"});
+      const rows:NuevaMetrica[] = parsed.data.map(r=>({
+        anio:Number(r["Año"]),mes:Number(r.Mes_num),mesNombre:(r.Mes||"").trim(),
+        red:v4Net(r.Red||""),entidad:V4_RENAMES[(r.Entidad||"").trim()] || (r.Entidad||"").trim(),
+        metrica:v4Metric(r["Métrica"]||""),valor:Number((r.Valor||"").replace(",",".")),
+        provincia:(r.Provincia||"").trim(),categoria:(r["Categoría"]||"").trim()
+      })).filter(r=>r.anio>=2020&&r.mes>=1&&r.mes<=12&&r.entidad&&V4_CATEGORIES.includes(r.categoria)&&Number.isFinite(r.valor));
+      // La clave cuenta + mes + métrica se considera única: no sumar inadvertidamente dos capturas.
+      const uniq=new Map<string,NuevaMetrica>();
+      rows.forEach(r=>{const key=[r.anio,r.mes,r.red,r.entidad,r.metrica,r.provincia,r.categoria].join("|");if(!uniq.has(key))uniq.set(key,r);});
+      setAll([...uniq.values()]);
+    };
+    const embedded=(window as any).__ENTITY_CSV__;
+    if (typeof embedded === "string" && embedded.length) {read(embedded);return;}
+    fetch(`${import.meta.env.BASE_URL}mega_metricas.csv`).then(res=>{
+      if(!res.ok) throw Error(`No se encontró mega_metricas.csv (HTTP ${res.status})`);
+      return res.text();
+    }).then(read).catch(e=>setError(String(e.message||e)));
+  },[]);
+  useEffect(()=>{setCategoria("Todas las categorías");setProvincia("Todas las provincias");setPeriodo("ultimo");setBusqueda("");setSeleccion([]);setVista("ranking");},[universe]);
+  const historicalRows=useMemo<NuevaMetrica[]>(()=>legacyData.map(r=>({
+    anio:r.año,mes:r.mes_n,mesNombre:r.Período,red:v4Net(r.RRSS),entidad:r.Gobernador,
+    metrica:v4Metric(r.Atributo),valor:r.Valor,provincia:r.Provincia,
+    categoria:GOBERNADORES_INFO[r.Gobernador]?.isGobierno?"Gobierno":"Gobernador"
+  })),[legacyData]);
+  const rows=useMemo(()=>universe==="comparador"?[...all,...historicalRows]:all.filter(r=>r.categoria===universe),[all,historicalRows,universe]);
+  const availableCategories=useMemo(()=>[...new Set(rows.map(r=>r.categoria))].sort((a,b)=>a.localeCompare(b,"es")),[rows]);
+  const filteredCat=useMemo(()=>rows.filter(r=>categoria==="Todas las categorías"||r.categoria===categoria),[rows,categoria]);
+  const availableProvince=useMemo(()=>[...new Set(filteredCat.map(r=>r.provincia))].filter(Boolean).sort((a,b)=>a.localeCompare(b,"es")),[filteredCat]);
+  const chosenProvince=useMemo(()=>filteredCat.filter(r=>provincia==="Todas las provincias"||r.provincia===provincia),[filteredCat,provincia]);
+  const availableNetworks=useMemo(()=>V4_NETWORKS.filter(n=>chosenProvince.some(r=>r.red===n)),[chosenProvince]);
+  useEffect(()=>{if(availableNetworks.length && red!=="Todas" && !availableNetworks.includes(red))setRed(availableNetworks[0]);},[availableNetworks,red]);
+  const base=useMemo(()=>chosenProvince.filter(r=>(red==="Todas"||r.red===red) && (!busqueda||r.entidad.toLocaleLowerCase("es").includes(busqueda.toLocaleLowerCase("es")))),[chosenProvince,red,busqueda]);
+  const months=useMemo(()=>[...new Set(base.map(v4Month))].sort((a,b)=>b-a),[base]);
+  // Último mes con datos REALES de la categoría+red, no último mes global.
+  const month=periodo==="ultimo"?months[0]:Number(periodo);
+  const periodRows=useMemo(()=>base.filter(r=>v4Month(r)===month),[base,month]);
+  const availableMetric=useMemo(()=>[...new Set([...V4_METRICS,...base.map(r=>r.metrica)])].filter(m=>base.some(r=>r.metrica===m)),[base]);
+  useEffect(()=>{if(availableMetric.length&&!availableMetric.includes(metrica))setMetrica(availableMetric[0]);},[availableMetric,metrica]);
+  const rankMonths=useMemo(()=>[...new Set(periodRows.map(r=>r.metrica))],[periodRows]);
+  const selectedMetricCards=useMemo(()=>{
+    const first=rankMetricas.filter(m=>rankMonths.includes(m));
+    const supplement=V4_METRICS.filter(m=>rankMonths.includes(m)&&!first.includes(m));
+    return [...first,...supplement].slice(0,5);
+  },[rankMonths,rankMetricas]);
+  const rankingFor=(m:string)=>{
+    const map=new Map<string,{id:string;name:string;red:string;categoria:string;value:number}>();
+    periodRows.filter(r=>r.metrica===m).forEach(r=>{
+      const id=v4Id(r);const prev=map.get(id);
+      map.set(id,{id,name:r.entidad,red:r.red,categoria:r.categoria,value:(prev?.value||0)+r.valor});
+    });
+    return [...map.values()].sort((a,b)=>b.value-a.value);
+  };
+  const ranked=rankingFor(metrica);
+  const profiles=useMemo(()=>{
+    const map=new Map<string,{id:string;name:string;net:string;categoria:string}>();
+    base.forEach(r=>{const id=v4Id(r);map.set(id,{id,name:r.entidad,net:r.red,categoria:r.categoria});});
+    return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,"es"));
+  },[base]);
+  const metricProfiles=useMemo(()=>profiles.filter(p=>base.some(r=>v4Id(r)===p.id&&r.metrica===metrica)),[profiles,base,metrica]);
+  const chosen=seleccion.length?seleccion.filter(id=>metricProfiles.some(p=>p.id===id)):metricProfiles.slice(0,Math.min(3,metricProfiles.length)).map(p=>p.id);
+  const monthly=useMemo(()=>{
+    const map=new Map<number, Record<string,any>>();
+    base.filter(r=>r.metrica===metrica&&chosen.includes(v4Id(r))).forEach(r=>{
+      const n=v4Month(r);let obj=map.get(n);
+      if(!obj){obj={n,periodo:`${String(r.mes).padStart(2,"0")}/${r.anio}`};map.set(n,obj);}
+      obj[v4Id(r)]=(obj[v4Id(r)]??0)+r.valor;
+    });
+    return [...map.values()].sort((a,b)=>a.n-b.n);
+  },[base,metrica,chosen.join("|")]);
+  const groupData=useMemo(()=>{
+    const out=new Map<string,{name:string;order:number;months:Set<number>;vals:Map<string,{v:number;at:number}>}>();
+    monthly.forEach(row=>{
+      const n=Number(row.n);const yy=Math.floor((n-1)/12),mm=(n-1)%12+1;
+      let name:string,order:number;
+      if(temporalidad==="trimestral"){const q=Math.ceil(mm/3);name=`T${q} ${yy}`;order=yy*4+q;}
+      else if(temporalidad==="semestral"){const h=Math.ceil(mm/6);name=`S${h} ${yy}`;order=yy*2+h;}
+      else if(temporalidad==="anual"){name=String(yy);order=yy;}
+      else{name=row.periodo;order=n;}
+      if(!out.has(name))out.set(name,{name,order,months:new Set(),vals:new Map()});
+      const g=out.get(name)!;g.months.add(n);
+      chosen.forEach(id=>{if(typeof row[id]!=="number")return;const prev=g.vals.get(id);
+        if(v4Stock(metrica)) {if(!prev||n>=prev.at)g.vals.set(id,{v:row[id],at:n});}
+        else g.vals.set(id,{v:(prev?.v||0)+row[id],at:n});
+      });
+    });
+    return [...out.values()].sort((a,b)=>a.order-b.order).map(g=>({name:g.name,order:g.order,completeMonths:g.months.size, ...Object.fromEntries([...g.vals].map(([k,v])=>[k,!v4Stock(metrica)&&calc==="promedio"?v.v/g.months.size:v.v]))}));
+  },[monthly,temporalidad,metrica,calc,chosen.join("|")]);
+  const visibleGrouped=useMemo(()=>groupData.filter(g=>(!desde||g.order>=Number(desde))&&(!hasta||g.order<=Number(hasta))),[groupData,desde,hasta]);
+  const baseline=useMemo(()=>{
+    if(!historico || temporalidad==="mensual")return null;
+    const monthsRequired=temporalidad==="anual"?12:temporalidad==="semestral"?6:3;
+    const means=chosen.map(id=>{
+      const vals=groupData.filter(g=>g.completeMonths===monthsRequired&&typeof (g as any)[id]==="number").map(g=>Number((g as any)[id]));
+      return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+    }).filter((x):x is number=>x!==null);
+    return means.length?means.reduce((a,b)=>a+b,0)/means.length:null;
+  },[historico,temporalidad,chosen.join("|"),groupData]);
+  const palette=["#d8223b","#1877F2","#C13584","#068787","#A35BCA","#EB8C24","#306A5B","#454545"];
+  const selectClass="bg-white border border-prosumia-gray-light rounded-xl px-3 py-2 text-xs font-semibold text-prosumia-dark max-w-full";
+  const monthLabel=(n:number)=>`${String((n-1)%12+1).padStart(2,"0")}/${Math.floor((n-1)/12)}`;
+  const downloadCSV=()=>{
+    const header="Año;Mes;Mes_num;Red;Entidad;Métrica;Valor;Provincia;Categoría";
+    const content=[header,...periodRows.map(r=>[r.anio,r.mesNombre,r.mes,r.red,r.entidad,r.metrica,r.valor,r.provincia,r.categoria].join(";"))].join("\n");
+    const url=URL.createObjectURL(new Blob(["\uFEFF"+content],{type:"text/csv;charset=utf-8"}));
+    const a=document.createElement("a");a.href=url;a.download=`prosumia_${universe.replaceAll(" ","_")}_${month||"sin_periodo"}.csv`;a.click();URL.revokeObjectURL(url);
+  };
+  return <section className="space-y-6 pb-12">
+    <div className="flex flex-wrap justify-between items-center gap-4">
+      <div><span className="text-[10px] uppercase tracking-widest text-prosumia-red font-bold">Prosumia · Universo de análisis</span>
+        <h2 className="font-poppins font-bold text-2xl mt-1">{universe==="comparador"?"Comparador general":universe}</h2>
+        <p className="text-sm text-prosumia-gray mt-1">{rows.length.toLocaleString("es-AR")} registros · {new Set(rows.map(r=>r.entidad)).size} entidades · Valores registrados, sin estimaciones</p></div>
+      <button onClick={downloadCSV} disabled={!periodRows.length} className="inline-flex items-center gap-2 px-4 py-2.5 bg-prosumia-dark text-white rounded-full text-xs font-bold disabled:opacity-30"><Download className="w-4 h-4"/> Exportar datos</button>
+    </div>
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-prosumia-gray-light bg-prosumia-gray-lighter/40 p-3">
+      <div className="flex bg-white/70 p-1 rounded-lg gap-1 mr-auto">{(["ranking","lectura","evolutivo","comparacion"] as const).map(v=><button key={v} onClick={()=>setVista(v)} className={cn("flex items-center gap-1.5 px-3 py-2 rounded-md font-bold text-xs",vista===v?"bg-white shadow-sm text-prosumia-dark":"text-prosumia-gray hover:text-prosumia-dark")}>{v==="ranking"?<LayoutDashboard className="w-3.5 h-3.5"/>:v==="lectura"?<FileText className="w-3.5 h-3.5"/>:v==="evolutivo"?<TrendingUpIcon className="w-3.5 h-3.5"/>:<BarChart2 className="w-3.5 h-3.5"/>}{v==="comparacion"?"Comparación":v[0].toUpperCase()+v.slice(1)}</button>)}</div>
+      {universe==="comparador"&&<select aria-label="Categoría" className={selectClass} value={categoria} onChange={e=>{setCategoria(e.target.value);setProvincia("Todas las provincias");setSeleccion([]);}}><option>Todas las categorías</option>{availableCategories.map(c=><option key={c}>{c}</option>)}</select>}
+      <select aria-label="Provincia" className={selectClass} value={provincia} onChange={e=>{setProvincia(e.target.value);setSeleccion([]);}}><option>Todas las provincias</option>{availableProvince.map(p=><option key={p}>{p}</option>)}</select>
+      <div className="flex rounded-xl p-1 gap-1 bg-white border border-prosumia-gray-light">{(universe==="comparador"?["Todas",...availableNetworks]:availableNetworks).map(n=><button key={n} onClick={()=>{setRed(n);setPeriodo("ultimo");setSeleccion([]);}} className={cn("px-2.5 py-1.5 rounded-lg text-xs font-bold",n===red?(n==="FB"?"bg-blue-600 text-white":n==="IG"?"bg-pink-600 text-white":"bg-prosumia-dark text-white"):"text-prosumia-gray")}>{v4Label(n)}</button>)}</div>
+      {vista!=="evolutivo"&&<select aria-label="Período" className={selectClass} value={periodo} onChange={e=>setPeriodo(e.target.value)}><option value="ultimo">Último mes con datos</option>{months.map(m=><option key={m} value={m}>{monthLabel(m)}</option>)}</select>}
+      <input value={busqueda} onChange={e=>{setBusqueda(e.target.value);setSeleccion([]);}} placeholder="Buscar cuenta..." aria-label="Buscar cuenta" className={selectClass}/>
+    </div>
+    {error&&<p className="p-4 border border-red-300 rounded-xl text-red-700">{error}</p>}
+    {!all.length&&!error&&<p className="p-6 text-prosumia-gray">Cargando base de entidades…</p>}
+    {!!all.length&&!base.length&&<p className="p-6 rounded-xl border border-dashed border-prosumia-gray-light text-prosumia-gray">No hay observaciones para esta selección. Cambiá la red o la provincia.</p>}
+    {!!base.length&&<>
+      {vista==="ranking"&&<>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+          {selectedMetricCards.map((m,i)=>{
+            const arr=rankingFor(m);return <RankingCard key={m} title={v4Label(m)} subtitle={`${v4Label(red)} · ${month?monthLabel(month):""} · ${arr.length} cuentas`} icon={i===0?<Users className="w-5 h-5"/>:i===1?<FileText className="w-5 h-5"/>:<BarChart2 className="w-5 h-5"/>}>
+              {arr.map((r,j)=><div key={r.id} className="group py-2 space-y-1.5"><div className="flex justify-between gap-2 text-xs items-center"><span className="flex items-center gap-2 min-w-0"><span className="text-prosumia-gray w-4 text-right">{j+1}</span><span className="w-6 h-6 rounded-full bg-prosumia-gray-lighter text-[9px] flex items-center justify-center font-bold shrink-0">{r.name.slice(0,2).toUpperCase()}</span><span title={r.name} className="font-semibold truncate">{r.name}</span></span><strong className="whitespace-nowrap">{v4Format(r.value)}</strong></div><div className="ml-8 h-1.5 rounded-full bg-prosumia-gray-lighter overflow-hidden"><div className={cn("h-full rounded-full",getTrafficLightColor(j,arr.length))} style={{width:`${arr[0]?.value>0?Math.max(1,100*r.value/arr[0].value):0}%`}}/></div></div>)}
+            </RankingCard>;
+          })}
         </div>
-        <span className="rounded-full px-3 py-1.5 text-xs font-bold bg-prosumia-gray-lighter border border-prosumia-gray-light text-prosumia-gray">Maqueta · Sin datos cargados</span>
-      </div>
-      {!isCross && <div className="flex flex-wrap gap-2 items-center justify-between bg-prosumia-gray-lighter rounded-2xl p-3">
-        <div className="flex flex-wrap gap-1 bg-white/60 p-1 rounded-xl">
-          {(["ranking", "lectura", "evolutivo", "comparacion"] as const).map(v => <button key={v} type="button" onClick={() => setView(v)}
-            className={cn("rounded-lg px-3 py-2 text-xs font-bold transition", view===v ? "bg-white shadow-sm text-prosumia-dark" : "text-prosumia-gray hover:text-prosumia-dark")}>{v === "comparacion" ? "Comparación" : v[0].toUpperCase()+v.slice(1)}</button>)}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <select aria-label="Categoría" className="rounded-xl border border-prosumia-gray-light bg-white px-3 py-2 text-xs font-semibold" value={filter} onChange={e=>setFilter(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select>
-          <select aria-label="Red social" className="rounded-xl border border-prosumia-gray-light bg-white px-3 py-2 text-xs font-semibold" value={network} onChange={e=>setNetwork(e.target.value)}><option value="FB">Facebook</option><option value="IG">Instagram</option><option value="TIK TOK">TikTok</option><option value="TW">X</option></select>
-        </div>
-      </div>}
-      {isCross ? <>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(["Gobernadores y gobiernos", "Dirigentes", "Medios digitales"] as const).map(c => <button key={c} type="button" onClick={()=>setChosen(p=>p.includes(c)?p.filter(x=>x!==c):[...p,c])}
-            className={cn("text-left px-5 py-4 rounded-2xl border transition-all", chosen.includes(c) ? "border-prosumia-dark bg-prosumia-gray-lighter" : "border-prosumia-gray-light bg-white hover:border-prosumia-gray")}>
-            <div className="flex items-center gap-3"><span className={cn("rounded-md w-5 h-5 border flex items-center justify-center text-xs",chosen.includes(c)?"bg-prosumia-dark text-white":"bg-white")}>{chosen.includes(c)?"✓":""}</span><span className="font-semibold text-sm">{c}</span></div>
-            <p className="text-xs text-prosumia-gray mt-2 pl-8">{c === "Gobernadores y gobiernos" ? "Universo existente" : "Pendiente de incorporación de datos"}</p>
-          </button>)}
-        </div>
-        <div className="rounded-2xl border border-prosumia-gray-light bg-white p-6">
-          <div className="flex flex-wrap justify-between gap-2"><h3 className="font-poppins font-bold">Área de comparación entre universos</h3><span className="text-xs text-prosumia-gray">{chosen.length} universos seleccionados</span></div>
-          <div className="border-2 border-dashed border-prosumia-gray-light rounded-xl mt-5 min-h-[230px] flex flex-col items-center justify-center gap-3 text-center px-6 bg-prosumia-gray-lighter/20"><BarChart2 className="w-9 h-9 text-prosumia-gray/40"/><p className="font-semibold text-prosumia-dark">Comparación transversal</p><p className="text-prosumia-gray text-xs max-w-lg">Acá se ubicarán las series elegidas con métricas y períodos homologados. No se muestran resultados hasta incorporar los datos y validar comparabilidad.</p></div>
-        </div>
-      </> : <>
-        {view === "ranking" ? <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">{cards.map((c,i)=><div key={i} className="bg-white rounded-2xl border border-prosumia-gray-light overflow-hidden shadow-sm"><div className="p-4 bg-prosumia-gray-lighter/30 border-b border-prosumia-gray-light"><div className="flex items-center gap-2 font-poppins font-bold text-sm"><span className="bg-prosumia-gray-lighter p-2 rounded-lg">{c.icon}</span>{c.name}</div><p className="text-[11px] text-prosumia-gray mt-2">{c.sub}</p></div><div className="p-4 space-y-5">{[1,2,3,4].map(j=><div key={j} className="flex items-center gap-2"><span className="text-xs text-prosumia-gray">{j}</span><div className="rounded-full bg-prosumia-gray-lighter w-7 h-7 flex-shrink-0"/><div className="flex-1"><div className="h-2 rounded-full bg-prosumia-gray-light/70 w-3/4"/><div className="h-1.5 rounded-full bg-prosumia-gray-lighter w-full mt-2"/></div></div>)}</div></div>)}</div> : <div className="rounded-2xl bg-white border border-prosumia-gray-light p-5 md:p-8 shadow-sm">
-          <h3 className="font-poppins font-bold text-lg">{titleByView[view]}</h3><p className="text-xs text-prosumia-gray mt-1">Estructura de la vista: sin registros ni valores simulados.</p>
-          {view === "lectura" ? <div className="grid sm:grid-cols-3 gap-3 mt-5">{["Información del perfil", "Indicadores", "Variación por período"].map(t=><div key={t} className="bg-prosumia-gray-lighter/30 rounded-xl border border-dashed border-prosumia-gray-light p-8 text-center text-sm text-prosumia-gray">{t}<p className="text-[11px] mt-2">Sin datos</p></div>)}</div> : <div className="mt-6 min-h-[280px] border-2 border-dashed border-prosumia-gray-light rounded-xl flex items-center justify-center bg-prosumia-gray-lighter/20"><div className="text-center text-prosumia-gray"><TrendingUpIcon className="w-9 h-9 mx-auto mb-3 opacity-40"/><p className="font-semibold text-sm">Área del gráfico</p><p className="text-xs mt-1">Selección de perfiles y períodos pendiente</p></div></div>}
-        </div>}
-        <p className="text-xs text-prosumia-gray">Esta sección es una maqueta de navegación. Los controles cambian la vista y los filtros de presentación, pero no consultan datos inexistentes.</p>
+        {!selectedMetricCards.length&&<p className="p-5 border rounded-xl text-prosumia-gray">No hay métricas en este mes. Seleccioná otro período.</p>}
       </>}
-    </section>
-  );
+      {vista!=="ranking"&&<div className="bg-white rounded-2xl border border-prosumia-gray-light p-5 md:p-7 shadow-sm space-y-5">
+        <div className="flex flex-wrap gap-3 items-center justify-between"><h3 className="font-poppins font-bold text-lg">{vista==="lectura"?"Lectura por cuenta":vista==="evolutivo"?"Evolución por cuenta y red":"Comparación entre cuentas"}</h3><div className="flex items-center gap-2"><span className="text-sm font-semibold text-prosumia-gray">Métrica:</span><select aria-label="Métrica" className={selectClass} value={metrica} onChange={e=>setMetrica(e.target.value)}>{availableMetric.map(m=><option key={m} value={m}>{v4Label(m)}</option>)}</select></div></div>
+        <div className="space-y-2"><div className="flex flex-wrap justify-between items-center gap-2"><span className="text-xs font-bold text-prosumia-dark">Cuentas seleccionadas ({chosen.length})</span><button className="text-xs text-prosumia-gray hover:text-prosumia-red font-semibold" onClick={()=>setSeleccion([])}>Restablecer selección</button></div><div className="max-h-36 overflow-auto flex flex-wrap gap-2">{profiles.map(p=><button key={p.id} onClick={()=>setSeleccion(prev=>prev.includes(p.id)?prev.filter(x=>x!==p.id):[...prev,p.id])} className={cn("rounded-full border px-3 py-1.5 font-semibold text-xs",chosen.includes(p.id)?"bg-prosumia-dark text-white border-prosumia-dark":"bg-white text-prosumia-gray border-prosumia-gray-light hover:border-prosumia-dark")} title={`${p.categoria} · ${p.net}`}>{p.name} <span className="opacity-65">· {v4Label(p.net)}</span></button>)}</div></div>
+        {vista==="lectura"&&<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{chosen.map(id=>{const account=profiles.find(p=>p.id===id)!;const vals=base.filter(r=>v4Id(r)===id&&r.metrica===metrica).sort((a,b)=>v4Month(b)-v4Month(a));const newest=vals[0],previous=vals[1];const delta=newest&&previous?newest.valor-previous.valor:null;
+          return <div key={id} className="border border-prosumia-gray-light rounded-xl p-5"><div className="flex gap-3 items-center"><span className="w-10 h-10 bg-prosumia-gray-lighter rounded-full text-sm font-bold flex items-center justify-center">{account.name.slice(0,2).toUpperCase()}</span><div className="min-w-0"><p className="font-poppins font-bold truncate">{account.name}</p><p className="text-xs text-prosumia-gray">{account.categoria} · {v4Label(account.net)}</p></div></div><p className="text-2xl font-poppins font-bold mt-4">{newest?v4Format(newest.valor):"Sin datos"}</p><p className="text-xs text-prosumia-gray mt-1">{v4Label(metrica)} · {newest?`${newest.mesNombre} ${newest.anio}`:""}</p><p className="text-xs font-semibold mt-3">{delta===null?"Sin período anterior comparable":`Diferencia con última observación: ${delta>=0?"+":""}${v4Format(delta)}`}</p></div>;})}</div>}
+        {vista==="evolutivo"&&<><div className="flex flex-wrap gap-3 items-center"><span className="text-xs font-semibold">Temporalidad:</span><div className="bg-prosumia-gray-lighter p-1 rounded-xl flex flex-wrap gap-1">{(["mensual","trimestral","semestral","anual"] as const).map(t=><button key={t} onClick={()=>{setTemporalidad(t);setDesde("");setHasta("");}} className={cn("px-3 py-1.5 text-xs rounded-lg font-bold",temporalidad===t?"bg-white text-prosumia-dark shadow-sm":"text-prosumia-gray")}>{t[0].toUpperCase()+t.slice(1)}</button>)}</div><span className="text-xs">Desde</span><select className={selectClass} value={desde} onChange={e=>setDesde(e.target.value)}><option value="">Primer período</option>{groupData.map(g=><option key={g.order} value={g.order}>{g.name}</option>)}</select><span className="text-xs">Hasta</span><select className={selectClass} value={hasta} onChange={e=>setHasta(e.target.value)}><option value="">Último período</option>{groupData.map(g=><option key={g.order} value={g.order}>{g.name}</option>)}</select>{!v4Stock(metrica)&&<select aria-label="Modalidad de cálculo" className={selectClass} value={calc} onChange={e=>setCalc(e.target.value as "total"|"promedio")}><option value="total">Total del período</option><option value="promedio">Promedio mensual</option></select>}{temporalidad!=="mensual"&&<label className="text-xs font-semibold flex items-center gap-2"><input type="checkbox" checked={historico} onChange={e=>setHistorico(e.target.checked)}/> Referencia histórica</label>}</div><p className="text-xs text-prosumia-gray">Los períodos incompletos no intervienen en el promedio histórico. Las series se eligen por cuenta y red, sin alterar la escala con cuentas no seleccionadas.</p></>}
+        {(vista==="evolutivo"||vista==="comparacion")&&<div className="h-[460px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={vista==="evolutivo"?visibleGrouped:monthly} margin={{top:20,right:30,bottom:20,left:10}}><CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.35}/><XAxis dataKey={vista==="evolutivo"?"name":"periodo"} tick={{fontSize:11}}/><YAxis tickFormatter={v4Format} tick={{fontSize:11}}/><RechartsTooltip formatter={(v:any)=>v4Format(Number(v))}/><Legend/>{vista==="evolutivo"&&baseline!==null&&<ReferenceLine y={baseline} stroke="#D97706" strokeDasharray="7 5" strokeWidth={2} label={{value:`Histórico ${v4Format(baseline)}`,fontSize:11,fill:"#A55A08",position:"insideTopRight"}}/>}{chosen.map((id,i)=><Line key={id} type="monotone" dataKey={id} name={`${profiles.find(p=>p.id===id)?.name||id} · ${v4Label(profiles.find(p=>p.id===id)?.net||red)}`} stroke={palette[i%palette.length]} strokeWidth={3} dot={{r:3}} connectNulls={false} isAnimationActive={false}/>)}</LineChart></ResponsiveContainer></div>}
+        {vista==="comparacion"&&<div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b text-prosumia-gray text-xs"><th className="p-3">Cuenta</th><th className="p-3">Categoría</th><th className="p-3">Red</th><th className="p-3 text-right">{v4Label(metrica)} · {month?monthLabel(month):""}</th></tr></thead><tbody>{chosen.map(id=>{const p=profiles.find(p=>p.id===id)!;const value=periodRows.find(r=>v4Id(r)===id&&r.metrica===metrica)?.valor;return <tr key={id} className="border-b border-prosumia-gray-lighter"><td className="p-3 font-semibold">{p.name}</td><td className="p-3">{p.categoria}</td><td className="p-3">{v4Label(p.net)}</td><td className="p-3 text-right font-bold">{value===undefined?"Sin dato":v4Format(value)}</td></tr>;})}</tbody></table></div>}
+      </div>}
+    </>}
+  </section>;
 }
+
 
 export function RankingCard({ title, subtitle, icon, children, colorClass }: any) {
   return (
@@ -1667,5 +1803,6 @@ export function getTrafficLightColor(rankIndex: number, totalCount: number) {
   if (totalCount > 6 && rankIndex >= totalCount - 12) return "bg-prosumia-red";
   return "bg-prosumia-yellow";
 }
+
 
 
