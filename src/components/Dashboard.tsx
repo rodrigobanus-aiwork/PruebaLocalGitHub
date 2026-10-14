@@ -954,6 +954,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
   const [startPeriodId, setStartPeriodId] = useState<string>("");
   const [endPeriodId, setEndPeriodId] = useState<string>("");
   // Las series del evolutivo se eligen por cuenta Y red (independientes de los filtros del ranking).
+  const [selectionMode, setSelectionMode] = useState<"clasico" | "personalizado">("clasico");
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
   const [seriesInitialized, setSeriesInitialized] = useState(false);
   const [seriesSearch, setSeriesSearch] = useState("");
@@ -976,7 +977,17 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
       setSeriesInitialized(true);
     }
   }, [seriesInitialized, availableSeries, selectedGovs]);
-  const activeSeries = useMemo(() => selectedSeries.filter(k => availableSeries.includes(k)), [selectedSeries, availableSeries]);
+  // Modo clásico: recupera el comportamiento original de selección por fotografías/escudos
+  // y botones de redes del encabezado. El modo personalizado no modifica esos filtros.
+  const activeSeries = useMemo(() => {
+    if (selectionMode === "personalizado") return selectedSeries.filter(k => availableSeries.includes(k));
+    return availableSeries.filter(key => {
+      const match = key.match(/^(.*) \((FB|IG|TW|TIK TOK|YT)\)$/);
+      if (!match) return false;
+      const [, account, network] = match;
+      return socials.includes(network) && (selectedGovs.length === 0 || selectedGovs.includes(account));
+    });
+  }, [selectionMode, selectedSeries, availableSeries, socials, selectedGovs]);
   const toggleSeries = (key: string) => setSelectedSeries(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   const colorForSeries = (account: string, net: string) => {
     const palettes: Record<string,string[]> = {
@@ -1325,7 +1336,22 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
         </div>
       </div>
 
-      {/* Selector no invasivo: las demás pestañas conservan sus filtros y estética originales. */}
+      {/* La selección clásica conserva fotos, escudos y redes; la personalizada es independiente. */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <span className="text-sm font-semibold text-prosumia-dark">Modo de selección:</span>
+        <div className="inline-flex bg-prosumia-gray-lighter rounded-xl p-1 gap-1">
+          {(["clasico", "personalizado"] as const).map(mode => (
+            <button key={mode} type="button" onClick={() => setSelectionMode(mode)}
+              className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-colors", selectionMode === mode ? "bg-white shadow-sm text-prosumia-dark" : "text-prosumia-gray hover:text-prosumia-dark")}>
+              {mode === "clasico" ? "Clásico" : "Personalizado"}
+            </button>
+          ))}
+        </div>
+      </div>
+      {selectionMode === "clasico" && (
+        <p className="text-xs text-prosumia-gray mb-4">Seleccioná fotografías o escudos arriba y elegí las redes del encabezado, como en Prosumia 1.0. Si no destacás ninguna cuenta, aparecen todas las de la región elegida.</p>
+      )}
+      {selectionMode === "personalizado" && (<>
       <div className="mb-5 border border-prosumia-gray-light rounded-xl p-3 bg-prosumia-gray-lighter/20">
         <div className="flex flex-wrap justify-between gap-2 items-center">
           <div className="text-sm font-bold text-prosumia-dark">Series del gráfico ({activeSeries.length})</div>
@@ -1362,6 +1388,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
         </div>}
       </div>
       {activeSeries.length === 0 && <p className="text-sm text-prosumia-gray mb-3">Elegí al menos una combinación de cuenta y red para visualizar su evolución.</p>}
+      </>)}
       <div className="h-[500px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 20, right: 40, left: 10, bottom: 20 }}>
@@ -1456,3 +1483,4 @@ export function getTrafficLightColor(rankIndex: number, totalCount: number) {
   if (totalCount > 6 && rankIndex >= totalCount - 12) return "bg-prosumia-red";
   return "bg-prosumia-yellow";
 }
+
