@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { DataRow, fetchAndParseData, GOBERNADORES_INFO } from "../lib/data";
 import { cn } from "../lib/utils";
 import { Facebook, Instagram, Twitter, MapPin, Calendar, TrendingUp, TrendingDown, Users, Activity, BarChart2, FileText, LayoutDashboard, MessageCircle as MessageCircleIcon, TrendingUp as TrendingUpIcon, Download, X, FileCode, CheckCircle2, Loader2, Sparkles, HelpCircle, HardDrive } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { LecturaView } from './LecturaView';
 import { ComparacionView } from './ComparacionView';
 import { Database } from "lucide-react";
@@ -953,6 +953,74 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
   const [granularity, setGranularity] = useState<"mensual" | "trimestral" | "semestral" | "anual">("mensual");
   const [startPeriodId, setStartPeriodId] = useState<string>("");
   const [endPeriodId, setEndPeriodId] = useState<string>("");
+  // Las series del evolutivo se eligen por cuenta Y red (independientes de los filtros del ranking).
+  const [selectionMode, setSelectionMode] = useState<"clasico" | "personalizado">("clasico");
+  const [showHistorical, setShowHistorical] = useState(false);
+  const [calculationMode, setCalculationMode] = useState<"acumulado" | "mensual">("acumulado");
+  const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
+  const [seriesInitialized, setSeriesInitialized] = useState(false);
+  const [seriesSearch, setSeriesSearch] = useState("");
+  const [seriesPanelOpen, setSeriesPanelOpen] = useState(false);
+  const seriesKey = (account: string, net: string) => `${account} (${net})`;
+  const networksOrder = ["FB", "IG", "TIK TOK", "TW", "YT"];
+  const availableSeries = useMemo(() => {
+    const seen = new Set<string>();
+    data.forEach(d => {
+      if (GOBERNADORES_INFO[d.Gobernador] && (regionFilter === "Todo" || GOBERNADORES_INFO[d.Gobernador]?.region === regionFilter) && networksOrder.includes(d.RRSS)) {
+        seen.add(seriesKey(d.Gobernador, d.RRSS));
+      }
+    });
+    return Array.from(seen).sort((a,b) => a.localeCompare(b, 'es'));
+  }, [data, regionFilter]);
+  useEffect(() => {
+    if (!seriesInitialized && availableSeries.length > 0) {
+      const preferred = availableSeries.filter(k => selectedGovs.some(g => k.startsWith(`${g} (`)) && k.endsWith('(FB)'));
+      setSelectedSeries((preferred.length ? preferred : availableSeries.filter(k => k.endsWith('(FB)'))).slice(0, 3));
+      setSeriesInitialized(true);
+    }
+  }, [seriesInitialized, availableSeries, selectedGovs]);
+  // La seleccion clasica es EXCLUSIVA: ocultar las cuentas restantes tambien del dominio del eje Y.
+  // Si todavia no hay seleccion, se conserva la vista general original.
+  const activeSeries = useMemo(() => {
+    if (selectionMode === "personalizado") return selectedSeries.filter(k => availableSeries.includes(k));
+    return availableSeries.filter(key => {
+      const match = key.match(/^(.*) \((FB|IG|TW|TIK TOK|YT)\)$/);
+      return !!match && socials.includes(match[2]) && (selectedGovs.length === 0 || selectedGovs.includes(match[1]));
+    });
+  }, [selectionMode, selectedSeries, availableSeries, socials, selectedGovs]);
+  const hasClassicHighlight = selectionMode === "clasico" && selectedGovs.length > 0;
+  const getOriginalNetworkColor = (net: string) => {
+    if (net === "FB") return "#1877F2";
+    if (net === "IG") return "#c13584";
+    if (net === "TW") return "#000000";
+    if (net === "TIK TOK") return "#FE2C55";
+    if (net === "YT") return "#E62117";
+    return "#041527";
+  };
+  const toggleSeries = (key: string) => setSelectedSeries(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  const colorForSeries = (account: string, net: string) => {
+    const palettes: Record<string,string[]> = {
+      FB: ["#124A9E", "#1877F2", "#368EDF", "#69B3FA", "#085BBF", "#0065A8"],
+      IG: ["#832060", "#C13584", "#E15A9A", "#9D378D", "#F075B5", "#A01964"],
+      "TIK TOK": ["#A80F32", "#FE2C55", "#DF4E68", "#F36B87", "#C52847", "#8E2844"],
+      TW: ["#171717", "#505050", "#777777", "#303A46", "#616C79", "#293545"],
+      YT: ["#BB0000", "#E62117", "#FF3434", "#CC3141", "#F06060", "#982121"]
+    };
+    // Hash fijo por cuenta (sin depender del orden de selección).
+    let hash = 0;
+    for (const char of account) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+    const palette = palettes[net] || ["#041527"];
+    // Cinco decenas de tonos reproducibles por plataforma: cada perfil tiene un tono estable.
+    // No depende de la cantidad u orden de las series seleccionadas.
+    const allAccounts = Object.keys(GOBERNADORES_INFO).sort((a,b) => a.localeCompare(b, "es"));
+    const accountIndex = allAccounts.indexOf(account);
+    if (accountIndex >= 0) {
+      const baseHue: Record<string, number> = { FB: 204, IG: 318, "TIK TOK": 346, TW: 205, YT: 0 };
+      if (net === "TW") return `hsl(215 8% ${22 + (accountIndex * 7) % 38}%)`;
+      return `hsl(${(baseHue[net] ?? 220) + (accountIndex % 11) * 2} ${70 + Math.floor(accountIndex / 11) * 3}% ${30 + (accountIndex * 7) % 23}%)`;
+    }
+    return palette[hash % palette.length];
+  };
 
   interface GroupedPeriod {
     id: string;
@@ -1022,8 +1090,8 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
   }, [groupedPeriods]);
 
   const availableMetricsCount = useMemo(() => {
-    return Array.from(new Set(data.filter((d: any) => socials.includes(d.RRSS)).map((d: any) => d.Atributo)));
-  }, [data, socials]);
+    return Array.from(new Set(data.filter((d: any) => activeSeries.includes(seriesKey(d.Gobernador, d.RRSS))).map((d: any) => d.Atributo)));
+  }, [data, activeSeries]);
 
   const availableMetrics = useMemo(() => {
     const desiredOrder = [
@@ -1069,8 +1137,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
     return "#041527";
   }, [socials]);
 
-  const govs = Array.from(new Set(data.filter((d: any) => socials.includes(d.RRSS)).map((d: any) => d.Gobernador)))
-    .filter((g: any) => regionFilter === "Todo" || GOBERNADORES_INFO[g as string]?.region === regionFilter);
+  const govs = Array.from(new Set(activeSeries.map(k => k.replace(/ \((FB|IG|TW|TIK TOK|YT)\)$/, ""))));
 
   const startIndex = Math.max(0, groupedPeriods.findIndex((p: any) => p.id === startPeriodId));
   const endIndex = Math.min(groupedPeriods.length - 1, groupedPeriods.findIndex((p: any) => p.id === endPeriodId));
@@ -1085,7 +1152,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
   const chartData = useMemo(() => {
     return activeGroupedPeriods.map(group => {
       const groupData = data.filter((d: any) => 
-        socials.includes(d.RRSS) &&
+        activeSeries.includes(seriesKey(d.Gobernador, d.RRSS)) &&
         group.months.some(m => m.month === d.mes_n && m.year === d.año)
       );
 
@@ -1108,7 +1175,8 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
       }
 
       govs.forEach((g: any) => {
-        socials.forEach(net => {
+        networksOrder.forEach(net => {
+          if (!activeSeries.includes(seriesKey(g, net))) return;
           const gData = groupData.filter((d: any) => d.Gobernador === g && d.RRSS === net);
           if (gData.length === 0) return;
 
@@ -1148,7 +1216,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
           const reacPadronPercent = (reac / padron) * 100;
           const engPost = pubs > 0 ? (reac / pubs) : 0;
 
-          const rowKey = socials.length > 1 ? `${g} (${net})` : g;
+          const rowKey = seriesKey(g, net);
 
           if (metric === "Engagement / Post") {
             row[rowKey] = engPost;
@@ -1182,11 +1250,11 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
         });
       });
 
-      const allRowKeys = govs.flatMap(g => socials.length > 1 ? socials.map(net => `${g} (${net})`) : [g]);
+      const allRowKeys = activeSeries;
       const validValues = allRowKeys
         .filter((k: any) => row[k] !== undefined)
         .map((k: any) => {
-           const govName = k.replace(/ \((FB|IG|TW|TIK TOK)\)$/, '');
+           const govName = k.replace(/ \((FB|IG|TW|TIK TOK|YT)\)$/, '');
            return { key: k, val: row[k], gov: govName, isGob: GOBERNADORES_INFO[govName]?.isGobierno || false };
         });
 
@@ -1196,11 +1264,11 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
       const assignRank = (sortedArray: any[], isGobType: boolean) => {
          const entityLabel = isGobType ? 'gobiernos' : 'gobernadores';
          sortedArray.forEach((item: any, index: number) => {
-            const isSelected = selectedGovs && selectedGovs.length > 0 ? selectedGovs.includes(item.gov) : true;
+            const isSelected = selectionMode === "personalizado" || selectedGovs.includes(item.gov);
             if (isSelected) {
                row[`${item.key}_extra`] += `\nPosición: #${index + 1} de ${sortedArray.length} ${entityLabel}`;
             } else {
-               delete row[item.key];
+               // Clásico: conservar serie de fondo y no mostrar detalle de ranking.
                delete row[`${item.key}_extra`];
             }
          });
@@ -1211,14 +1279,80 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
 
       return row;
     });
-  }, [activeGroupedPeriods, data, socials, govs, metric, selectedGovs, granularity]);
+  }, [activeGroupedPeriods, data, activeSeries, govs, metric, granularity, selectionMode, selectedGovs]);
+
+  // Referencia historica: una sola linea, calculada en la unidad del grafico.
+  // Cada perfil/red tiene el mismo peso, independientemente de cuantos periodos reporte.
+  // Se excluyen periodos incompletos y meses sin registros de las metricas necesarias.
+  const historicalReference = useMemo(() => {
+    if (!showHistorical || !["trimestral", "anual"].includes(granularity)) return null;
+    if (selectionMode === "clasico" && selectedGovs.length === 0) return null;
+    if (activeSeries.length === 0) return null;
+    const expectedMonths = granularity === "trimestral" ? 3 : 12;
+    const perSeriesMeans: number[] = [];
+    const requiredAttributes = metric === "Fans" || metric === "Penetración Padrón (%)" ? ["Fans"]
+      : metric === "Engagement / Post" ? ["Publicaciones", "Reacciones", "Fans"]
+      : metric === "Reacciones / Padrón (%)" ? ["Reacciones", "Fans"]
+      : metric === "Publicaciones" || metric === "Reacciones" ? [metric, "Fans"] : [metric, "Fans"];
+    let historicalPeriods = 0;
+    activeSeries.forEach(key => {
+      const match = key.match(/^(.*) \((FB|IG|TW|TIK TOK|YT)\)$/);
+      if (!match) return;
+      const [, account, net] = match;
+      const records = data.filter(d => d.Gobernador === account && d.RRSS === net);
+      const values: number[] = [];
+      groupedPeriods.forEach(group => {
+        if (group.months.length !== expectedMonths) return;
+        const months = group.months;
+        const monthlyValues = months.map(m => {
+          const items = records.filter(d => d.mes_n === m.month && d.año === m.year);
+          const attributes = new Map(items.map(d => [d.Atributo, d.Valor]));
+          return attributes;
+        });
+        if (!monthlyValues.every(m => requiredAttributes.every(attr => m.has(attr)))) return;
+        const sum = (attr: string) => monthlyValues.reduce((total, m) => total + Number(m.get(attr) || 0), 0);
+        const finalFans = Number(monthlyValues[monthlyValues.length - 1].get("Fans") || 0);
+        if (!Number.isFinite(finalFans) || finalFans <= 0) return;
+        const padron = GOBERNADORES_INFO[account]?.padron || 1;
+        const pubs = sum("Publicaciones");
+        const reac = sum("Reacciones");
+        let val: number;
+        if (metric === "Fans") val = finalFans;
+        else if (metric === "Penetración Padrón (%)") val = finalFans / padron * 100;
+        else if (metric === "Engagement / Post") val = pubs > 0 ? reac / pubs : 0;
+        else if (metric === "Reacciones / Padrón (%)") val = reac / padron * 100;
+        else val = sum(metric);
+        if (calculationMode === "mensual" && (metric === "Publicaciones" || metric === "Reacciones")) val /= expectedMonths;
+        if (Number.isFinite(val)) values.push(val);
+      });
+      if (values.length) {
+        perSeriesMeans.push(values.reduce((a,b) => a+b, 0) / values.length);
+        historicalPeriods += values.length;
+      }
+    });
+    if (!perSeriesMeans.length) return null;
+    return { value: perSeriesMeans.reduce((a,b)=>a+b,0)/perSeriesMeans.length,
+      seriesCount: perSeriesMeans.length, periods: historicalPeriods };
+  }, [showHistorical, granularity, selectionMode, selectedGovs, activeSeries, metric, calculationMode, data, groupedPeriods]);
+
+  const displayedChartData = useMemo(() => {
+    if (calculationMode !== "mensual" || (metric !== "Publicaciones" && metric !== "Reacciones")) return chartData;
+    return chartData.map((row, i) => {
+      const months = activeGroupedPeriods[i]?.months.length || 1;
+      const updated = { ...row };
+      activeSeries.forEach(key => { if (typeof updated[key] === "number") updated[key] /= months; });
+      return updated;
+    });
+  }, [chartData, calculationMode, metric, activeGroupedPeriods, activeSeries]);
+  const showReferenceOption = granularity === "trimestral" || granularity === "anual";
+  const selectedAccountsCount = new Set(activeSeries.map(k=>k.replace(/ \((FB|IG|TW|TIK TOK|YT)\)$/,""))).size;
 
   const colors = ["#e60026", "#041527", "#1CB86D", "#FF9F1C", "#2EC4B6", "#E71D36", "#011627", "#8338EC", "#3A86FF", "#FF006E", "#8A94A5", "#F15BB5", "#9B5DE5", "#00F5D4", "#FEE440"];
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-prosumia-gray-light p-6 md:p-8 mt-8">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-        <h2 className="text-xl font-poppins font-bold text-prosumia-dark mr-4">Evolución en {socials.join(", ")}</h2>
+        <h2 className="text-xl font-poppins font-bold text-prosumia-dark mr-4">{selectionMode === "clasico" ? `Evolución en ${socials.join(", ")}` : "Evolución por cuenta y red"}</h2>
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-prosumia-gray">Temporalidad:</span>
@@ -1277,9 +1411,85 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
         </div>
       </div>
 
+      {/* La selección clásica conserva fotos, escudos y redes; la personalizada es independiente. */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <span className="text-sm font-semibold text-prosumia-dark">Modo de selección:</span>
+        <div className="inline-flex bg-prosumia-gray-lighter rounded-xl p-1 gap-1">
+          {(["clasico", "personalizado"] as const).map(mode => (
+            <button key={mode} type="button" onClick={() => setSelectionMode(mode)}
+              className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-colors", selectionMode === mode ? "bg-white shadow-sm text-prosumia-dark" : "text-prosumia-gray hover:text-prosumia-dark")}>
+              {mode === "clasico" ? "Clásico" : "Personalizado"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 mb-4 text-xs">
+        {(metric === "Publicaciones" || metric === "Reacciones") && (
+          <div className="inline-flex items-center gap-2 bg-prosumia-gray-lighter rounded-xl p-2">
+            <span className="font-semibold text-prosumia-gray">Cálculo:</span>
+            <select className="bg-white border border-prosumia-gray-light rounded-lg px-2 py-1.5 font-semibold text-prosumia-dark"
+              value={calculationMode} onChange={e=>setCalculationMode(e.target.value as "acumulado" | "mensual")}>
+              <option value="acumulado">Total del período</option>
+              <option value="mensual">Promedio mensual</option>
+            </select>
+          </div>
+        )}
+        {showReferenceOption && (
+          <label className="inline-flex items-center gap-2 bg-prosumia-gray-lighter rounded-xl px-3 py-2 font-semibold text-prosumia-dark cursor-pointer">
+            <input type="checkbox" checked={showHistorical} onChange={e=>setShowHistorical(e.target.checked)} className="accent-red-600" />
+            Referencia histórica horizontal
+          </label>
+        )}
+        {showReferenceOption && showHistorical && (
+          <span className="text-prosumia-gray">
+            {historicalReference ? `${selectedAccountsCount === 1 ? "Promedio de la cuenta" : "Promedio conjunto"} · ${historicalReference.seriesCount} serie(s), ${historicalReference.periods} períodos completos` : "Sin períodos históricos completos comparables"}
+          </span>
+        )}
+      </div>
+      {selectionMode === "clasico" && (
+        <p className="text-xs text-prosumia-gray mb-4">Seleccioná fotografías o escudos y las redes del encabezado. Se muestran solamente las cuentas elegidas, sin líneas grises ni influencia de las demás sobre la escala. Sin cuentas seleccionadas se muestra la vista general.</p>
+      )}
+      {selectionMode === "personalizado" && (<>
+      <div className="mb-5 border border-prosumia-gray-light rounded-xl p-3 bg-prosumia-gray-lighter/20">
+        <div className="flex flex-wrap justify-between gap-2 items-center">
+          <div className="text-sm font-bold text-prosumia-dark">Series del gráfico ({activeSeries.length})</div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setSelectedSeries([])} className="text-xs font-semibold text-prosumia-gray hover:text-prosumia-dark px-3 py-2">Limpiar</button>
+            <button type="button" onClick={() => setSeriesPanelOpen(o => !o)} className="text-xs font-bold rounded-lg bg-white border border-prosumia-gray-light px-3 py-2 hover:border-prosumia-red">
+              {seriesPanelOpen ? "Cerrar selector" : "Elegir cuentas y redes"}
+            </button>
+          </div>
+        </div>
+        {activeSeries.length > 0 && <div className="flex flex-wrap gap-2 mt-3">
+          {activeSeries.map(key => {
+            const match = key.match(/^(.*) \((FB|IG|TW|TIK TOK|YT)\)$/);
+            const account = match?.[1] || key;
+            const net = match?.[2] || "FB";
+            return <button type="button" key={key} onClick={() => toggleSeries(key)} title={`Quitar ${key}`} className="inline-flex gap-2 items-center bg-white border border-prosumia-gray-light rounded-lg px-2.5 py-1.5 text-xs font-semibold text-prosumia-dark">
+              <span className="w-5 h-[3px] rounded-full" style={{backgroundColor: colorForSeries(account, net)}} />{key} <span aria-hidden="true">×</span>
+            </button>;
+          })}
+        </div>}
+        {seriesPanelOpen && <div className="mt-3 bg-white rounded-lg border border-prosumia-gray-light p-3">
+          <input aria-label="Buscar cuenta" placeholder="Buscar gobernador o gobierno..." value={seriesSearch} onChange={e=>setSeriesSearch(e.target.value)} className="w-full border border-prosumia-gray-light rounded-lg px-3 py-2 text-sm mb-3" />
+          <div className="max-h-64 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
+            {availableSeries.filter(k => k.toLocaleLowerCase('es').includes(seriesSearch.toLocaleLowerCase('es'))).map(key=>{
+              const match = key.match(/^(.*) \((FB|IG|TW|TIK TOK|YT)\)$/);
+              const account=match?.[1]||key, net=match?.[2]||"FB";
+              return <label key={key} className="flex items-center gap-2 cursor-pointer rounded-lg hover:bg-prosumia-gray-lighter px-2 py-1.5 text-xs text-prosumia-dark">
+                <input type="checkbox" checked={selectedSeries.includes(key)} onChange={()=>toggleSeries(key)} className="accent-red-600" />
+                <span className="w-5 h-[3px] flex-shrink-0" style={{backgroundColor:colorForSeries(account,net)}} />
+                <span>{account} · {net === 'TW' ? 'X' : net}</span>
+              </label>;
+            })}
+          </div>
+        </div>}
+      </div>
+      {activeSeries.length === 0 && <p className="text-sm text-prosumia-gray mb-3">Elegí al menos una combinación de cuenta y red para visualizar su evolución.</p>}
+      </>)}
       <div className="h-[500px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 20, right: 40, left: 10, bottom: 20 }}>
+          <LineChart data={displayedChartData} margin={{ top: 20, right: 40, left: 10, bottom: 20 }}>
             <defs>
               <clipPath id="circleClip" clipPathUnits="objectBoundingBox">
                 <circle cx="0.5" cy="0.5" r="0.5" />
@@ -1294,25 +1504,22 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
               tickFormatter={(val) => new Intl.NumberFormat("es-AR", { notation: "compact" }).format(val)} 
               dx={-10}
             />
-            <RechartsTooltip content={<CustomTooltip selectedGovs={selectedGovs} metric={metric} />} />
+            <RechartsTooltip content={<CustomTooltip selectedGovs={selectionMode === "clasico" ? selectedGovs : activeSeries} metric={metric} />} />
             <Legend wrapperStyle={{ paddingTop: "20px" }} />
-            {govs.flatMap(g => socials.length > 1 ? socials.map(net => ({ gov: g, net })) : [{ gov: g, net: socials[0] }])
-              .filter(({ gov }) => selectedGovs && selectedGovs.length > 0 ? selectedGovs.includes(gov) : true)
+            {showReferenceOption && historicalReference && (
+              <ReferenceLine y={historicalReference.value} stroke="#D97706" strokeWidth={2} strokeDasharray="7 5"
+                label={{ value: `Promedio histórico: ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(historicalReference.value)}`, position: "insideTopRight", fill: "#A55A08", fontSize: 11 }} />
+            )}
+            {activeSeries.map(key => {
+                const match = key.match(/^(.*) \((FB|IG|TW|TIK TOK|YT)\)$/);
+                return { gov: match?.[1] || key, net: match?.[2] || "FB" };
+              })
               .map(({ gov, net }, i: number) => {
-              const rowKey = socials.length > 1 ? `${gov} (${net})` : gov;
-              const isSelected = selectedGovs.includes(gov);
-              const isDimmed = selectedGovs.length > 0 ? !isSelected : false;
+              const rowKey = seriesKey(gov, net);
+              const isSelected = selectionMode === "personalizado" || selectedGovs.includes(gov);
+              const isDimmed = hasClassicHighlight && !selectedGovs.includes(gov);
               
-              const getLineColor = () => {
-                if (net === "FB") return "#1877F2";
-                if (net === "IG") return "#c13584";
-                if (net === "TW") return "#000000";
-                if (net === "TIK TOK") return "#FE2C55";
-                return "#041527";
-              };
-              
-              const lineColor = getLineColor();
-              
+              const lineColor = selectionMode === "personalizado" ? colorForSeries(gov, net) : getOriginalNetworkColor(net);
               const CustomLabel = (props: any) => {
                 const { x, y, index } = props;
                 if (index === chartData.length - 1 && chartData[index][rowKey] !== undefined) { // End of line
@@ -1321,7 +1528,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
                   return (
                     <g>
                       <image href={image} x={x + 10} y={y - 12} height="24px" width="24px" clipPath={info.isGobierno ? undefined : "url(#circleClip)"} preserveAspectRatio={info.isGobierno ? "xMidYMid meet" : "xMidYMid slice"} />
-                      {socials.length > 1 && (
+                      {(selectionMode === "personalizado" || socials.length > 1) && (
                          <text x={x + 38} y={y + 4} fontSize="10" fontWeight="bold" fill={lineColor}>{net}</text>
                       )}
                     </g>
@@ -1339,7 +1546,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
                     strokeWidth={isSelected ? 4 : 2}
                     dot={isSelected ? { r: 5, fill: lineColor, strokeWidth: 2, stroke: "#fff" } : { r: 0 }}
                     activeDot={{ r: 6, strokeWidth: 0 }}
-                    opacity={isDimmed ? 0.15 : 1}
+                    opacity={1}
                     label={<CustomLabel />}
                     isAnimationActive={false}
                   />
@@ -1378,3 +1585,4 @@ export function getTrafficLightColor(rankIndex: number, totalCount: number) {
   if (totalCount > 6 && rankIndex >= totalCount - 12) return "bg-prosumia-red";
   return "bg-prosumia-yellow";
 }
+
