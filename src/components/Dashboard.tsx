@@ -6,6 +6,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { LecturaView } from './LecturaView';
 import { ComparacionView } from './ComparacionView';
 import { Database } from "lucide-react";
+import EntityModule from "./EntityModule";
 
 const GOV_ORDER = [
   "M. Pullaro",
@@ -514,7 +515,7 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-        {universe !== "gobernadores" && <ProsumiaModulePreview universe={universe} />}
+        {universe !== "gobernadores" && <EntityModule universe={universe} />}
         {universe === "gobernadores" && <>
         {/* Governor Highlight Selector */}
         {visibleGovernors.length > 0 && (

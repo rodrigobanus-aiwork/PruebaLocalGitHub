@@ -1,0 +1,12 @@
+PROSUMIA - ETAPA 1 RANKING DE ENTIDADES
+
+Subir estos tres archivos preservando rutas:
+- src/components/Dashboard.tsx (solo un import y una llamada cambiados)
+- src/components/EntityModule.tsx (nuevo)
+- public/mega_metricas.csv (8.503 observaciones)
+
+No reemplazar public/data.csv ni componentes de Gobernadores.
+public/EntityModule.tsx (legado, no importado) sigue existiendo en el ZIP original; no lo utilice como componente ni lo confunda con src/components/EntityModule.tsx. Puede provocar errores de tipado si se incluye public/ en tsconfig: eliminarlo o moverlo fuera del proyecto tras respaldarlo.
+
+ESTADO: controles estaticos y parseo TSX aprobados. Compilacion Vite y pruebas visuales NO comprobadas por falta de dependencias en este entorno.
+Pendientes: confirmar equivalencia TT/TK y clasificacion Detractor->Medios; integrar Lectura, Evolutivo y Comparacion.
