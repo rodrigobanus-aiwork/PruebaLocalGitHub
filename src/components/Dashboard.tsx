@@ -359,7 +359,7 @@ export default function Dashboard() {
             </div>
 
             {/* View Tabs */}
-            {universe === "gobernadores" && <div className="hidden md:flex bg-prosumia-gray-lighter p-1 rounded-lg ml-4">
+            {<div className="hidden md:flex bg-prosumia-gray-lighter p-1 rounded-lg ml-4">
               <button 
                 onClick={() => setActiveTab("ranking")}
                 className={cn("flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold font-sans transition-all duration-200", activeTab === "ranking" ? "bg-white text-prosumia-dark shadow-sm ring-1 ring-black/5" : "text-prosumia-gray hover:text-prosumia-dark")}
@@ -515,7 +515,7 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-        {universe !== "gobernadores" && <EntityModule universe={universe} />}
+        {universe !== "gobernadores" && <EntityModule universe={universe} activeTab={activeTab} />}
         {universe === "gobernadores" && <>
         {/* Governor Highlight Selector */}
         {visibleGovernors.length > 0 && (
@@ -1668,9 +1668,5 @@ export function getTrafficLightColor(rankIndex: number, totalCount: number) {
   if (totalCount > 6 && rankIndex >= totalCount - 12) return "bg-prosumia-red";
   return "bg-prosumia-yellow";
 }
-
-
-
-
 
 
