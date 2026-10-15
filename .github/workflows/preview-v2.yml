@@ -1,0 +1,99 @@
+
+name: Prosumia - Vista previa de desarrollo
+
+on:
+  push:
+    branches-ignore:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ==========================================
+      # 01. DESCARGAR VERSION ESTABLE
+      # ==========================================
+      - name: Descargar Prosumia estable
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: stable
+
+      # ==========================================
+      # 02. DESCARGAR RAMA DE DESARROLLO
+      # ==========================================
+      - name: Descargar rama de prueba
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          path: experimental
+
+      # ==========================================
+      # 03. PREPARAR ENTORNO
+      # ==========================================
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # ==========================================
+      # 04. COMPILAR VERSION ESTABLE
+      # ==========================================
+      - name: Compilar version estable
+        working-directory: stable
+        run: |
+          npm install --no-audit --no-fund
+          npx vite build \
+            --base /PruebaLocalGitHub/ \
+            --outDir ../site \
+            --emptyOutDir
+
+      # ==========================================
+      # 05. COMPILAR RAMA DE PRUEBA
+      # ==========================================
+      - name: Compilar version experimental
+        working-directory: experimental
+        run: |
+          npm install --no-audit --no-fund
+          npx vite build \
+            --base /PruebaLocalGitHub/v2/ \
+            --outDir ../site/v2 \
+            --emptyOutDir
+
+      # ==========================================
+      # 06. PREPARAR PUBLICACION
+      # ==========================================
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir sitio compilado
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # ==========================================
+  # 07. PUBLICAR
+  # ==========================================
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Publicar Prosumia
+        uses: actions/deploy-pages@v4
+        id: deployment
