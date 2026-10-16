@@ -1,0 +1,33 @@
+PROSUMIA - Etapa 2 - Navegacion comun + cuatro vistas para nuevas entidades
+
+RAMA DE PRUEBA: prueba-ranking-entidades. No modificar main.
+
+Archivos que se suben manteniendo exactamente estas rutas:
+  src/components/Dashboard.tsx         REEMPLAZAR
+  src/components/EntityModule.tsx      REEMPLAZAR
+
+No hace falta volver a subir public/mega_metricas.csv: se utiliza el de Etapa 1.
+NO reemplazar public/data.csv ni los otros componentes React.
+
+ALCANCE DE ESTA VERSION
+- Los cuatro botones originales del encabezado se muestran en todos los universos.
+- Gobernadores conserva el codigo previo salvo esas dos conexiones de Dashboard.
+- Las seis categorias del CSV se mantienen seleccionables.
+- Nuevas entidades: Ranking, Lectura analitica basica, Evolutivo multiserie y
+  Comparacion con cinco columnas de red/indicador independientes.
+- TT y TK NO se fusionan. Ausencia de metricas != 0.
+
+LIMITACIONES A VALIDAR
+- No se afirma equivalencia de diseño ni funcionalidades de Lectura/Evolutivo/
+  Comparacion con los componentes de Gobernadores: esta version los implementa
+  con calculos propios para entidades sin padron, en EntityModule.tsx.
+- Gráfico temporal sin fotos al final de cada linea: leyenda por cuenta y red.
+- Media temporal simple, no el algoritmo de referencia histórica de Gobernadores.
+- No se pudo ejecutar npm ci sin red; se validaron sintaxis TSX y pruebas estaticas,
+  no compilacion real, ni pruebas visuales en navegador.
+
+PRUEBA
+1. Subir dos archivos solamente a rama de prueba.
+2. Esperar GitHub Actions en verde y abrir /PruebaLocalGitHub/v2/.
+3. Confirmar navegación, círculos, filtros y cinco columnas para cada vista.
+4. Volver a Gobernadores y verificar las cuatro vistas originales.
