@@ -14,6 +14,8 @@ import Papa from 'papaparse';
 import { Users, FileText, Heart, MessageCircle, Activity, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { RankingCard, ProgressBar, getTrafficLightColor } from './Dashboard';
+import { entityPhoto } from '../lib/entityPhotos';
+import { entityPhoto } from '../lib/entityPhotos';
 
 export type Universe = 'Detractor' | 'Municipios de Chubut' | 'Otros municipios' | 'Intendentes de Chubut' | 'Otros intendentes' | 'Ministro provincial' | 'Ministerio provincial' | 'Figuras nacionales' | 'Influencer correntino' | 'comparador';
 export type AnalysisTab = 'ranking' | 'lectura' | 'evolutivo' | 'comparacion';
@@ -33,16 +35,7 @@ const fmt = (n:number) => new Intl.NumberFormat('es-AR',{maximumFractionDigits:1
 const periodId = (r:Entry) => `${r.year}-${String(r.month).padStart(2,'0')}`;
 const keyOf = (r:Entry) => `${r.category}\u001f${r.entity}`;
 const initials = (name:string) => name.trim().split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase();
-// Fotografías aprobadas disponibles en public/imagenes. Las restantes conservan iniciales.
-const LOCAL_PHOTOS: Record<string, string> = {
-  'Figuras nacionales\u001fJavier Milei': 'figuras-nacionales--javier-milei.png',
-  'Figuras nacionales\u001fPatricia Bullrich': 'figuras-nacionales--patricia-bullrich.png',
-  'Figuras nacionales\u001fMauricio Macri': 'figuras-nacionales--mauricio-macri.png',
-};
-function photoFor(category:string, name:string): string | undefined {
-  const filename = LOCAL_PHOTOS[`${category}\u001f${name}`];
-  return filename ? `${import.meta.env.BASE_URL}imagenes/${filename}` : undefined;
-}
+const photoFor = entityPhoto;
 const selectClass = 'max-w-full rounded-full border border-prosumia-gray-light bg-white px-4 py-2.5 text-sm font-bold text-prosumia-dark shadow-sm';
 const periodName=(p:string)=>{ const [y,m]=p.split('-').map(Number);return new Intl.DateTimeFormat('es-AR',{month:'long',year:'numeric'}).format(new Date(y,m-1,1)); };
 
@@ -358,7 +351,7 @@ function EntityEvolutivo({rows,selected,granularity,setGranularity,metric,setMet
       <p className="text-xs text-prosumia-gray mb-4">{active.length} series de cuenta y red · {metricSelected==='Fans'?'Seguidores: último dato de cada período':'Métrica de flujo: suma de las observaciones disponibles por período'}</p>
       {!chart.length?<p className="text-sm text-prosumia-gray py-12 text-center">Elegí series y un intervalo con observaciones para visualizar la evolución.</p>:<div className="w-full h-[420px]"><ResponsiveContainer width="100%" height="100%"><LineChart data={chart} margin={{top:15,right:25,bottom:5,left:5}}><CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb"/><XAxis dataKey="period" tick={{fontSize:11}}/><YAxis tick={{fontSize:11}} width={74} tickFormatter={v=>fmt(v)}/><RechartsTooltip formatter={(v:any)=>typeof v==='number'?fmt(v):'Sin dato'}/><Legend wrapperStyle={{fontSize:11}}/>{active.map((s,i)=><Line key={s.key} name={`${s.name} (${s.net})`} type="monotone" dataKey={s.key} stroke={SERIES_COLORS[i%SERIES_COLORS.length]} strokeWidth={2} dot={{r:3}} connectNulls={false} isAnimationActive={false}/>)}{historicalMean!==null&&<ReferenceLine y={historicalMean} stroke="#777" strokeDasharray="5 5" label="Media"/>}</LineChart></ResponsiveContainer></div>}
     </div>
-    <p className="text-xs text-prosumia-gray">Sin fotos disponibles: las series se identifican por nombre y red. TT y TK continúan separados. Los indicadores derivados y la referencia histórica de años completos requieren validación adicional antes de incorporarse.</p>
+    <p className="text-xs text-prosumia-gray">Las series del Evolutivo se identifican actualmente por nombre y red; sus fotografías aún no están integradas en las líneas. TT y TK continúan separados. Los indicadores derivados y la referencia histórica de años completos requieren validación adicional antes de incorporarse.</p>
   </section>;
 }
 
