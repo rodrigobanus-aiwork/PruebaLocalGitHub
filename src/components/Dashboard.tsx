@@ -7,6 +7,7 @@ import { LecturaView } from './LecturaView';
 import { ComparacionView } from './ComparacionView';
 import { Database } from "lucide-react";
 import EntityModule from "./EntityModule";
+import { fetchWeeklyRows, WeeklyRow, weeklyPeriods } from "../lib/weekly";
 
 const GOV_ORDER = [
   "M. Pullaro",
@@ -113,6 +114,10 @@ export default function Dashboard() {
   const [socialFilter, setSocialFilter] = useState<"FB" | "IG" | "TW" | "TIK TOK">("FB");
   const [evolutivoSocials, setEvolutivoSocials] = useState<string[]>(["FB"]);
   const [periodFilter, setPeriodFilter] = useState("");
+  const [rankingFrequency, setRankingFrequency] = useState<"mensual" | "semanal">("mensual");
+  const [weeklyRows, setWeeklyRows] = useState<WeeklyRow[]>([]);
+  const [weeklyPeriod, setWeeklyPeriod] = useState("");
+  const [weeklyError, setWeeklyError] = useState("");
   const [typeFilter, setTypeFilter] = useState<"Gobernadores" | "Gobiernos" | "Ambos">("Gobernadores");
   const [selectedGovs, setSelectedGovs] = useState<string[]>([]);
 
@@ -192,6 +197,25 @@ export default function Dashboard() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    fetchWeeklyRows(import.meta.env.BASE_URL).then(setWeeklyRows).catch(e => setWeeklyError(String(e)));
+  }, []);
+  const weeks = useMemo(() => weeklyPeriods(weeklyRows), [weeklyRows]);
+  const selectedWeek = weeklyPeriod && weeks.some(w => w.id === weeklyPeriod) ? weeklyPeriod : (weeks[0]?.id || "");
+  const weeklyStats = useMemo(() => {
+    const match = weeklyRows.filter(r => r.period === selectedWeek && r.network === socialFilter);
+    const names = [...new Set(match.map(r => r.entity))];
+    return names.map(name => {
+      const values = match.filter(r => r.entity === name);
+      const read = (m: string) => values.find(r => r.metric === m)?.value ?? null;
+      const followers = read("Seguidores"), posts = read("Publicaciones"), interactions = read("Interacciones");
+      return { name, followers, posts, interactions, reach: read("Alcance"),
+        interactionsPerPost: interactions !== null && posts !== null && posts > 0 ? interactions / posts : null,
+        isGobierno: Boolean(GOBERNADORES_INFO[name]?.isGobierno), region: GOBERNADORES_INFO[name]?.region || "Unknown" };
+    }).filter(r => (regionFilter === "Todo" || r.region === regionFilter) &&
+      (typeFilter === "Ambos" || (typeFilter === "Gobiernos" ? r.isGobierno : !r.isGobierno)));
+  }, [weeklyRows, selectedWeek, socialFilter, regionFilter, typeFilter]);
 
   const availablePeriods = useMemo(() => {
     const periodsMap = new Map<string, { month: number, year: number, name: string }>();
@@ -365,7 +389,7 @@ export default function Dashboard() {
                   <span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-prosumia-red" /> Argentina</span>
                   <span className="w-1 h-1 rounded-full bg-prosumia-gray-light" />
                   <span className="flex items-center gap-1.5">
-                    <TrendingUpIcon className="w-3.5 h-3.5" /> Ranking Mensual
+                    <TrendingUpIcon className="w-3.5 h-3.5" /> Ranking {activeTab === "ranking" && rankingFrequency === "semanal" ? "Semanal" : "Mensual"}
                   </span>
                 </div>
               </div>
@@ -476,18 +500,28 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {activeTab === "ranking" && (
+              <div className="flex bg-prosumia-gray-lighter p-1 rounded-xl" aria-label="Periodicidad del ranking">
+                {(["mensual", "semanal"] as const).map(f => (
+                  <button key={f} type="button" onClick={() => setRankingFrequency(f)}
+                    className={cn("px-3 py-2 rounded-lg text-xs font-bold", rankingFrequency === f ? "bg-white shadow-sm text-prosumia-dark" : "text-prosumia-gray")}>
+                    {f === "mensual" ? "Mensual" : "Semanal"}
+                  </button>
+                ))}
+              </div>
+            )}
             {/* Date Dropdown */}
             <div className={`relative group ${activeTab === 'evolutivo' ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                 <Calendar className="h-4 w-4 text-prosumia-red" />
               </div>
               <select 
-                value={periodFilter} 
-                onChange={e => setPeriodFilter(e.target.value)}
+                value={activeTab === "ranking" && rankingFrequency === "semanal" ? selectedWeek : periodFilter}
+                onChange={e => activeTab === "ranking" && rankingFrequency === "semanal" ? setWeeklyPeriod(e.target.value) : setPeriodFilter(e.target.value)}
                 className="pl-9 pr-10 py-2.5 bg-white border border-prosumia-gray-light text-prosumia-dark text-sm font-bold font-sans rounded-full appearance-none shadow-sm focus:outline-none focus:ring-2 focus:ring-prosumia-red/20 focus:border-prosumia-red transition-all cursor-pointer hover:bg-gray-50 focus:bg-white capitalize w-[195px]"
                 disabled={activeTab === 'evolutivo'}
               >
-                {availablePeriods.map(p => (
+                {(activeTab === "ranking" && rankingFrequency === "semanal" ? weeks : availablePeriods).map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
@@ -654,7 +688,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {stats.length === 0 && !loading && (
+        {stats.length === 0 && !loading && !(activeTab === "ranking" && rankingFrequency === "semanal") && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-prosumia-gray-lighter rounded-2xl border border-prosumia-gray-light border-dashed z-10">
             <Activity className="w-12 h-12 text-prosumia-gray mb-4" />
             <p className="text-prosumia-dark font-poppins font-bold text-lg">No hay datos para esta selección.</p>
@@ -662,7 +696,15 @@ export default function Dashboard() {
           </div>
         )}
 
-        {activeTab === "ranking" ? (
+        {activeTab === "ranking" && rankingFrequency === "semanal" ? (
+          <div>
+            <p className="text-xs text-prosumia-gray mb-4">Ranking semanal · corte seleccionado: {weeks.find(w => w.id === selectedWeek)?.name || "Sin semana disponible"}.
+              Seguidores es un stock del corte; Publicaciones, Interacciones y Alcance son métricas semanales.
+              No se equiparan Interacciones con Reacciones mensuales.</p>
+            {weeklyError && <p role="alert" className="text-red-600 text-sm">Error al leer datos semanales: {weeklyError}</p>}
+            <WeeklyRanking rows={weeklyStats} selected={selectedGovs} />
+          </div>
+        ) : activeTab === "ranking" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 xl:gap-8 overflow-x-hidden">
             
             {/* Column 1: Followers */}
@@ -804,6 +846,7 @@ export default function Dashboard() {
             socials={evolutivoSocials}
             regionFilter={regionFilter}
             availablePeriods={availablePeriods}
+            weeklyRows={weeklyRows}
           />
         ) : activeTab === "comparacion" ? (
           <ComparacionView 
@@ -990,9 +1033,9 @@ const CustomTooltip = ({ active, payload, label, selectedGovs, metric }: any) =>
   return null;
 };
 
-function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePeriods }: { data: DataRow[], selectedGovs: string[], socials: string[], regionFilter: string, availablePeriods?: any[] }) {
+function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePeriods, weeklyRows }: { data: DataRow[], selectedGovs: string[], socials: string[], regionFilter: string, availablePeriods?: any[], weeklyRows: WeeklyRow[] }) {
   const [metric, setMetric] = useState("Fans");
-  const [granularity, setGranularity] = useState<"mensual" | "trimestral" | "semestral" | "anual">("mensual");
+  const [granularity, setGranularity] = useState<"semanal" | "mensual" | "trimestral" | "semestral" | "anual">("mensual");
   const [startPeriodId, setStartPeriodId] = useState<string>("");
   const [endPeriodId, setEndPeriodId] = useState<string>("");
   // Las series del evolutivo se eligen por cuenta Y red (independientes de los filtros del ranking).
@@ -1090,7 +1133,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
       let displayName = "";
       let sortValue = 0;
 
-      if (granularity === "mensual") {
+      if (granularity === "mensual" || granularity === "semanal") {
         id = `${month}-${year}`;
         displayName = `${name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()} de ${year}`;
         sortValue = year * 12 + month;
@@ -1399,7 +1442,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-prosumia-gray">Temporalidad:</span>
             <div className="flex bg-prosumia-gray-lighter p-1 rounded-xl">
-              {(["mensual", "trimestral", "semestral", "anual"] as const).map(g => (
+              {(["semanal", "mensual", "trimestral", "semestral", "anual"] as const).map(g => (
                 <button
                   key={g}
                   onClick={() => setGranularity(g)}
@@ -1410,13 +1453,13 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
                       : "text-prosumia-gray hover:text-prosumia-dark"
                   )}
                 >
-                  {g === "mensual" ? "Mensual" : g === "trimestral" ? "Trimestral" : g === "semestral" ? "Semestral" : "Anual"}
+                  {g === "semanal" ? "Semanal" : g === "mensual" ? "Mensual" : g === "trimestral" ? "Trimestral" : g === "semestral" ? "Semestral" : "Anual"}
                 </button>
               ))}
             </div>
           </div>
 
-          {groupedPeriods.length > 0 && (
+          {granularity !== "semanal" && groupedPeriods.length > 0 && (
             <div className="flex items-center gap-2 bg-prosumia-gray-lighter p-2 rounded-xl">
               <span className="text-sm font-semibold text-prosumia-gray">Desde:</span>
               <select 
@@ -1435,6 +1478,7 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
             </div>
           )}
 
+          {granularity !== "semanal" && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-prosumia-gray">Métrica:</span>
             <select 
@@ -1450,9 +1494,13 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
             })}
           </select>
         </div>
+          )}
         </div>
       </div>
 
+      {granularity === "semanal" ? (
+        <WeeklyEvolution rows={weeklyRows} selected={selectedGovs} socials={socials} regionFilter={regionFilter} />
+      ) : (<>
       {/* La selección clásica conserva fotos, escudos y redes; la personalizada es independiente. */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <span className="text-sm font-semibold text-prosumia-dark">Modo de selección:</span>
@@ -1597,12 +1645,71 @@ function EvolutivosView({ data, selectedGovs, socials, regionFilter, availablePe
           </LineChart>
         </ResponsiveContainer>
       </div>
+      </>)}
     </div>
   );
 }
 
 
 
+
+type WeeklyStat = {name: string; followers: number | null; posts: number | null; interactions: number | null; reach: number | null; interactionsPerPost: number | null; isGobierno: boolean; region: string};
+function WeeklyRanking({rows, selected}: {rows: WeeklyStat[]; selected: string[]}) {
+  const metrics: {key: keyof WeeklyStat; label:string; subtitle:string; icon:React.ReactNode}[] = [
+    {key:"followers",label:"Seguidores",subtitle:"Stock al corte semanal",icon:<Users className="w-5 h-5"/>},
+    {key:"posts",label:"Publicaciones",subtitle:"Publicaciones de la semana",icon:<FileText className="w-5 h-5"/>},
+    {key:"interactions",label:"Interacciones",subtitle:"Interacciones semanales (no reacciones)",icon:<Activity className="w-5 h-5"/>},
+    {key:"interactionsPerPost",label:"Interacciones / Post",subtitle:"Interacciones ÷ publicaciones",icon:<TrendingUp className="w-5 h-5"/>},
+    {key:"reach",label:"Alcance",subtitle:"Alcance semanal reportado",icon:<BarChart2 className="w-5 h-5"/>}
+  ];
+  return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 xl:gap-8">
+    {metrics.map(m => {const sorted=rows.filter(r => typeof r[m.key] === "number").sort((a,b)=>(Number(b[m.key])-Number(a[m.key])));
+      const max=Math.max(1,...sorted.map(r=>Number(r[m.key])));
+      return <RankingCard key={m.key} title={m.label} subtitle={m.subtitle} icon={m.icon} colorClass="bg-prosumia-gray-lighter">
+        {sorted.length ? sorted.map((r,i)=><ProgressBar key={r.name} rank={i+1} name={r.name} value={r[m.key]} max={max}
+          colorClass={getTrafficLightColor(i,sorted.length)} isHighlighted={selected.includes(r.name)} hasHighlighted={selected.length>0}
+          format={(v:number)=>Number.isInteger(v)?formatAbs(v):v.toLocaleString("es-AR",{maximumFractionDigits:1})} />)
+         : <p className="text-xs text-prosumia-gray py-6">Sin datos de esta métrica para el corte y red seleccionados.</p>}
+      </RankingCard>;
+    })}
+  </div>;
+}
+function WeeklyEvolution({rows, selected, socials, regionFilter}: {rows:WeeklyRow[];selected:string[];socials:string[];regionFilter:string}) {
+  const weeks=useMemo(()=>weeklyPeriods(rows).slice().reverse(),[rows]);
+  const [start,setStart]=useState(""); const [end,setEnd]=useState("");
+  const [metric,setMetric]=useState("Seguidores");
+  const [selectedWeekly,setSelectedWeekly]=useState<string[]>([]);
+  const [custom,setCustom]=useState(false);
+  const first=start&&weeks.some(w=>w.id===start)?start:weeks[0]?.id||"";
+  const last=end&&weeks.some(w=>w.id===end)?end:weeks[weeks.length-1]?.id||"";
+  const netRows=rows.filter(r=>(regionFilter==="Todo"||GOBERNADORES_INFO[r.entity]?.region===regionFilter));
+  const candidate=[...new Set(netRows.map(r=>`${r.entity} (${r.network})`))].sort();
+  const picked=custom ? selectedWeekly : candidate.filter(k=>socials.some(n=>k.endsWith(`(${n})`))&&(!selected.length||selected.some(n=>k.startsWith(`${n} (`))));
+  const shown=picked.slice(0,36);
+  const series=weeks.filter(w=>w.id>=first&&w.id<=last).map(w=>{
+    const obj:any={name:w.name};
+    for(const key of shown){const i=key.lastIndexOf(" (");const entity=key.slice(0,i),network=key.slice(i+2,-1);
+      const value=netRows.find(r=>r.period===w.id&&r.entity===entity&&r.network===network&&r.metric===metric)?.value;
+      if(value!==undefined)obj[key]=value;
+    }
+    return obj;
+  });
+  const palette=["#1877F2","#C13584","#222222","#FE2C55","#E62117","#0EA75D","#F59E0B","#7C3AED"];
+  return <div>
+    <p className="text-xs text-prosumia-gray mb-4">Datos semanales independientes de los mensuales. Cada serie empieza en su primer corte con datos; los faltantes no se reemplazan por cero.</p>
+    <div className="flex flex-wrap gap-3 items-center mb-4">
+      <label className="text-xs font-semibold">Desde <select className="block border rounded-lg p-2 mt-1" value={first} onChange={e=>setStart(e.target.value)}>{weeks.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label>
+      <label className="text-xs font-semibold">Hasta <select className="block border rounded-lg p-2 mt-1" value={last} onChange={e=>setEnd(e.target.value)}>{weeks.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label>
+      <label className="text-xs font-semibold">Métrica <select className="block border rounded-lg p-2 mt-1" value={metric} onChange={e=>setMetric(e.target.value)}>{["Seguidores","Publicaciones","Interacciones","Alcance","Engagement Rate","Score Ranking"].map(m=><option key={m}>{m}</option>)}</select></label>
+      <label className="inline-flex gap-2 text-xs items-center"><input type="checkbox" checked={custom} onChange={e=>setCustom(e.target.checked)}/> Selección personalizada</label>
+    </div>
+    {custom && <div className="mb-4 max-h-36 overflow-auto grid sm:grid-cols-3 gap-1 border rounded-xl p-3">{candidate.map(k=><label key={k} className="text-xs"><input type="checkbox" checked={selectedWeekly.includes(k)} onChange={e=>setSelectedWeekly(prev=>prev.includes(k)?prev.filter(x=>x!==k):[...prev,k])}/> {k}</label>)}</div>}
+    <div className="h-[500px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={series} margin={{top:20,right:30,left:10,bottom:20}}>
+      <CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis tickFormatter={v=>new Intl.NumberFormat("es-AR",{notation:"compact"}).format(v)} tick={{fontSize:11}}/>
+      <RechartsTooltip/><Legend/>{shown.map((k,i)=><Line key={k} dataKey={k} name={k} stroke={palette[i%palette.length]} type="monotone" strokeWidth={2} connectNulls={false} dot={{r:2}} isAnimationActive={false}/>)}</LineChart></ResponsiveContainer></div>
+    {!shown.length&&<p className="text-sm text-prosumia-gray">No hay cuentas seleccionadas para la vista semanal.</p>}
+  </div>;
+}
 
 /** Maqueta de estructura futura: no calcula ni simula estadísticas. */
 function ProsumiaModulePreview({ universe }: {universe: "dirigentes" | "medios" | "comparador"}) {

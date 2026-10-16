@@ -103,7 +103,7 @@ export async function fetchAndParseData(csvText: string): Promise<DataRow[]> {
       delimiter: ";", // Explicitly define the delimiter
       complete: (results) => {
         const rows: DataRow[] = (results.data as any[])
-          .filter(row => row.Gobernador && row.Atributo) // Filter out incomplete rows
+          .filter(row => row.Gobernador && row.Atributo && row.periodicidad !== "semanal") // Only monthly for existing views
           .map((row) => ({
             año: parseInt(row.año, 10),
             Período: row.Período || row.Periodo,
