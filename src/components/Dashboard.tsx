@@ -6,6 +6,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { LecturaView } from './LecturaView';
 import { ComparacionView } from './ComparacionView';
 import { Database } from "lucide-react";
+import EntityModule from "./EntityModule";
 
 const GOV_ORDER = [
   "M. Pullaro",
@@ -19,10 +20,23 @@ const GOV_ORDER = [
 ];
 
 // Components
-export function ProgressBar({ name, value, max, colorClass, suffix = "", format = (v: number) => Math.round(v).toLocaleString("es-AR"), rank, tooltipText, isHighlighted, hasHighlighted }: any) {
+/**
+ * COMPONENTE VISUAL ORIGINAL, REUTILIZABLE.
+ * visualInfo es opcional: permite identificar entidades externas sin introducir
+ * sus nombres ni imagenes en GOBERNADORES_INFO. Sin visualInfo, se conserva el
+ * comportamiento literal de Gobernadores (imagen, nombre, escudo y estilos).
+ * La ausencia de una imagen no elimina la cuenta del ranking.
+ * IMPORTANTE: este cambio NO conecta aun las nuevas series ni modifica formulas.
+ */
+export type RankingEntityVisualInfo = {
+  image?: string;
+  displayName?: string;
+  isGobierno?: boolean;
+};
+export function ProgressBar({ name, value, max, colorClass, suffix = "", format = (v: number) => Math.round(v).toLocaleString("es-AR"), rank, tooltipText, isHighlighted, hasHighlighted, visualInfo }: any & { visualInfo?: RankingEntityVisualInfo }) {
   const percentage = max > 0 ? (value / max) * 100 : 0;
-  const info: any = GOBERNADORES_INFO[name] || {};
-  const displayName = info.isGobierno ? info.provincia : name;
+  const info: any = visualInfo ?? GOBERNADORES_INFO[name] ?? {};
+  const displayName = visualInfo?.displayName ?? (info.isGobierno ? info.provincia : name);
   
   return (
     <div className={cn("flex flex-col gap-1.5 py-2 group relative transition-opacity duration-300", hasHighlighted && !isHighlighted ? "opacity-30 grayscale hover:grayscale-0 hover:opacity-100" : "")}>
@@ -89,7 +103,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   
   // Universo de análisis. Los módulos nuevos son maquetas sin datos.
-  const [universe, setUniverse] = useState<"gobernadores" | "dirigentes" | "medios" | "comparador">("gobernadores");
+  const [universe, setUniverse] = useState<"gobernadores" | "Detractor" | "Municipios de Chubut" | "Otros municipios" | "Intendentes de Chubut" | "Otros intendentes" | "Ministro provincial" | "Ministerio provincial" | "Figuras nacionales" | "Influencer correntino" | "comparador">("gobernadores");
 
   // Tabs
   const [activeTab, setActiveTab] = useState<"ranking" | "lectura" | "evolutivo" | "comparacion">("ranking");
@@ -344,7 +358,7 @@ export default function Dashboard() {
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Analytics Logo" className="w-11 h-11 object-contain shrink-0 rounded-xl shadow-sm" />
               <div>
                 <h1 className="font-poppins text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-prosumia-dark to-prosumia-gray tracking-tight leading-none">
-                  {universe === "gobernadores" ? "Ranking de Gobernadores" : universe === "dirigentes" ? "Dirigentes" : universe === "medios" ? "Medios" : "Comparador"}
+                  {universe === "gobernadores" ? "Ranking de Gobernadores" : universe === "comparador" ? "Comparador" : universe}
                 </h1>
                 <span className="text-[10px] uppercase font-bold text-prosumia-gray/70 tracking-widest block mt-0.5 mb-1.5">powered by analytics</span>
                 <div className="flex items-center gap-3 text-xs text-prosumia-gray font-medium font-sans">
@@ -358,7 +372,7 @@ export default function Dashboard() {
             </div>
 
             {/* View Tabs */}
-            {universe === "gobernadores" && <div className="hidden md:flex bg-prosumia-gray-lighter p-1 rounded-lg ml-4">
+            {<div className="hidden md:flex bg-prosumia-gray-lighter p-1 rounded-lg ml-4">
               <button 
                 onClick={() => setActiveTab("ranking")}
                 className={cn("flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold font-sans transition-all duration-200", activeTab === "ranking" ? "bg-white text-prosumia-dark shadow-sm ring-1 ring-black/5" : "text-prosumia-gray hover:text-prosumia-dark")}
@@ -500,10 +514,17 @@ export default function Dashboard() {
       <main className="max-w-[1600px] mx-auto px-6 mt-8 relative min-h-[60vh]">
         <div className="flex flex-wrap gap-2 mb-7 border-b border-prosumia-gray-light pb-5" aria-label="Universos de análisis">
           {([
-            {id: "gobernadores", text: "Gobernadores", sub: "Provinciales"},
-            {id: "dirigentes", text: "Dirigentes", sub: "Personas públicas"},
-            {id: "medios", text: "Medios", sub: "Cuentas digitales"},
-            {id: "comparador", text: "Comparador", sub: "Entre universos"}
+            {id: "gobernadores", text: "Gobernadores y Gobiernos", sub: "Provinciales"},
+            {id: "Detractor", text: "Detractor", sub: "Categoría original"},
+            {id: "Municipios de Chubut", text: "Municipios de Chubut", sub: "Provincia: Chubut"},
+            {id: "Otros municipios", text: "Otros municipios", sub: "Resto del país"},
+            {id: "Intendentes de Chubut", text: "Intendentes de Chubut", sub: "Provincia: Chubut"},
+            {id: "Otros intendentes", text: "Otros intendentes", sub: "Resto del país"},
+            {id: "Ministro provincial", text: "Ministro provincial", sub: "Categoría original"},
+            {id: "Ministerio provincial", text: "Ministerio provincial", sub: "Categoría original"},
+            {id: "Figuras nacionales", text: "Figuras nacionales", sub: "Categoría original"},
+            {id: "Influencer correntino", text: "Influencer correntino", sub: "Categoría original"},
+            {id: "comparador", text: "Comparador", sub: "Entre categorías"}
           ] as const).map(item => (
             <button key={item.id} type="button" onClick={() => setUniverse(item.id)}
               className={cn("flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all border min-w-[175px]",
@@ -514,7 +535,7 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-        {universe !== "gobernadores" && <ProsumiaModulePreview universe={universe} />}
+        {universe !== "gobernadores" && <EntityModule key={universe} universe={universe} activeTab={activeTab} />}
         {universe === "gobernadores" && <>
         {/* Governor Highlight Selector */}
         {visibleGovernors.length > 0 && (
