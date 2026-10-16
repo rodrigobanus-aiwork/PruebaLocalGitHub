@@ -20,10 +20,23 @@ const GOV_ORDER = [
 ];
 
 // Components
-export function ProgressBar({ name, value, max, colorClass, suffix = "", format = (v: number) => Math.round(v).toLocaleString("es-AR"), rank, tooltipText, isHighlighted, hasHighlighted }: any) {
+/**
+ * COMPONENTE VISUAL ORIGINAL, REUTILIZABLE.
+ * visualInfo es opcional: permite identificar entidades externas sin introducir
+ * sus nombres ni imagenes en GOBERNADORES_INFO. Sin visualInfo, se conserva el
+ * comportamiento literal de Gobernadores (imagen, nombre, escudo y estilos).
+ * La ausencia de una imagen no elimina la cuenta del ranking.
+ * IMPORTANTE: este cambio NO conecta aun las nuevas series ni modifica formulas.
+ */
+export type RankingEntityVisualInfo = {
+  image?: string;
+  displayName?: string;
+  isGobierno?: boolean;
+};
+export function ProgressBar({ name, value, max, colorClass, suffix = "", format = (v: number) => Math.round(v).toLocaleString("es-AR"), rank, tooltipText, isHighlighted, hasHighlighted, visualInfo }: any & { visualInfo?: RankingEntityVisualInfo }) {
   const percentage = max > 0 ? (value / max) * 100 : 0;
-  const info: any = GOBERNADORES_INFO[name] || {};
-  const displayName = info.isGobierno ? info.provincia : name;
+  const info: any = visualInfo ?? GOBERNADORES_INFO[name] ?? {};
+  const displayName = visualInfo?.displayName ?? (info.isGobierno ? info.provincia : name);
   
   return (
     <div className={cn("flex flex-col gap-1.5 py-2 group relative transition-opacity duration-300", hasHighlighted && !isHighlighted ? "opacity-30 grayscale hover:grayscale-0 hover:opacity-100" : "")}>
@@ -359,7 +372,7 @@ export default function Dashboard() {
             </div>
 
             {/* View Tabs */}
-            {universe === "gobernadores" && <div className="hidden md:flex bg-prosumia-gray-lighter p-1 rounded-lg ml-4">
+            {<div className="hidden md:flex bg-prosumia-gray-lighter p-1 rounded-lg ml-4">
               <button 
                 onClick={() => setActiveTab("ranking")}
                 className={cn("flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold font-sans transition-all duration-200", activeTab === "ranking" ? "bg-white text-prosumia-dark shadow-sm ring-1 ring-black/5" : "text-prosumia-gray hover:text-prosumia-dark")}
@@ -515,7 +528,7 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-        {universe !== "gobernadores" && <EntityModule universe={universe} />}
+        {universe !== "gobernadores" && <EntityModule universe={universe} activeTab={activeTab} />}
         {universe === "gobernadores" && <>
         {/* Governor Highlight Selector */}
         {visibleGovernors.length > 0 && (
