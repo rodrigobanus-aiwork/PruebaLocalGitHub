@@ -103,7 +103,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   
   // Universo de análisis. Los módulos nuevos son maquetas sin datos.
-  const [universe, setUniverse] = useState<"gobernadores" | "Detractor" | "Municipio" | "Intendente" | "Ministro provincial" | "Ministerio provincial" | "Figuras nacionales" | "Influencer correntino" | "comparador">("gobernadores");
+  const [universe, setUniverse] = useState<"gobernadores" | "Detractor" | "Municipios de Chubut" | "Otros municipios" | "Intendentes de Chubut" | "Otros intendentes" | "Ministro provincial" | "Ministerio provincial" | "Figuras nacionales" | "Influencer correntino" | "comparador">("gobernadores");
 
   // Tabs
   const [activeTab, setActiveTab] = useState<"ranking" | "lectura" | "evolutivo" | "comparacion">("ranking");
@@ -516,8 +516,10 @@ export default function Dashboard() {
           {([
             {id: "gobernadores", text: "Gobernadores y Gobiernos", sub: "Provinciales"},
             {id: "Detractor", text: "Detractor", sub: "Categoría original"},
-            {id: "Municipio", text: "Municipio", sub: "Categoría original"},
-            {id: "Intendente", text: "Intendente", sub: "Categoría original"},
+            {id: "Municipios de Chubut", text: "Municipios de Chubut", sub: "Provincia: Chubut"},
+            {id: "Otros municipios", text: "Otros municipios", sub: "Resto del país"},
+            {id: "Intendentes de Chubut", text: "Intendentes de Chubut", sub: "Provincia: Chubut"},
+            {id: "Otros intendentes", text: "Otros intendentes", sub: "Resto del país"},
             {id: "Ministro provincial", text: "Ministro provincial", sub: "Categoría original"},
             {id: "Ministerio provincial", text: "Ministerio provincial", sub: "Categoría original"},
             {id: "Figuras nacionales", text: "Figuras nacionales", sub: "Categoría original"},

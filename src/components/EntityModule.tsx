@@ -11,11 +11,11 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import Papa from 'papaparse';
-import { Users, FileText, Heart, MessageCircle, Activity, TrendingUp } from 'lucide-react';
+import { Users, FileText, Heart, MessageCircle, Activity, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { RankingCard, ProgressBar, getTrafficLightColor } from './Dashboard';
 
-export type Universe = 'Detractor' | 'Municipio' | 'Intendente' | 'Ministro provincial' | 'Ministerio provincial' | 'Figuras nacionales' | 'Influencer correntino' | 'comparador';
+export type Universe = 'Detractor' | 'Municipios de Chubut' | 'Otros municipios' | 'Intendentes de Chubut' | 'Otros intendentes' | 'Ministro provincial' | 'Ministerio provincial' | 'Figuras nacionales' | 'Influencer correntino' | 'comparador';
 export type AnalysisTab = 'ranking' | 'lectura' | 'evolutivo' | 'comparacion';
 type Entry = {
   year: number; month: number; network: string; entity: string;
@@ -33,6 +33,16 @@ const fmt = (n:number) => new Intl.NumberFormat('es-AR',{maximumFractionDigits:1
 const periodId = (r:Entry) => `${r.year}-${String(r.month).padStart(2,'0')}`;
 const keyOf = (r:Entry) => `${r.category}\u001f${r.entity}`;
 const initials = (name:string) => name.trim().split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase();
+// Fotografías aprobadas disponibles en public/imagenes. Las restantes conservan iniciales.
+const LOCAL_PHOTOS: Record<string, string> = {
+  'Figuras nacionales\u001fJavier Milei': 'figuras-nacionales--javier-milei.png',
+  'Figuras nacionales\u001fPatricia Bullrich': 'figuras-nacionales--patricia-bullrich.png',
+  'Figuras nacionales\u001fMauricio Macri': 'figuras-nacionales--mauricio-macri.png',
+};
+function photoFor(category:string, name:string): string | undefined {
+  const filename = LOCAL_PHOTOS[`${category}\u001f${name}`];
+  return filename ? `${import.meta.env.BASE_URL}imagenes/${filename}` : undefined;
+}
 const selectClass = 'max-w-full rounded-full border border-prosumia-gray-light bg-white px-4 py-2.5 text-sm font-bold text-prosumia-dark shadow-sm';
 const periodName=(p:string)=>{ const [y,m]=p.split('-').map(Number);return new Intl.DateTimeFormat('es-AR',{month:'long',year:'numeric'}).format(new Date(y,m-1,1)); };
 
@@ -125,7 +135,7 @@ function RankCard({metric, entries, selected, onToggle}:{
             tooltipText={tooltipText}
             hasHighlighted={selected.length>0}
             isHighlighted={isHighlighted}
-            visualInfo={{displayName:item.name,image:localInitialsAvatar(item.name),isGobierno:false}}
+            visualInfo={{displayName:item.name,image:photoFor(item.category,item.name) ?? localInitialsAvatar(item.name),isGobierno:false}}
           />
         </div>;
       })}
@@ -159,7 +169,14 @@ export default function EntityModule({universe,activeTab}:{universe:Universe;act
     request.then(raw=>{if(alive)setData(parseCSV(raw));}).catch(e=>{if(alive)setError(String(e.message||e));}).finally(()=>{if(alive)setLoading(false);});
     return()=>{alive=false;};
   },[]);
-  const universeRows=useMemo(()=>data.filter(r=>universe==='comparador'||r.category===universe),[data,universe]);
+  const universeRows=useMemo(()=>data.filter(r=>
+    universe==='comparador' ||
+    (universe==='Municipios de Chubut' && r.category==='Municipio' && r.province.trim().toLocaleLowerCase('es')==='chubut') ||
+    (universe==='Otros municipios' && r.category==='Municipio' && r.province.trim().toLocaleLowerCase('es')!=='chubut') ||
+    (universe==='Intendentes de Chubut' && r.category==='Intendente' && r.province.toLocaleLowerCase('es')==='chubut') ||
+    (universe==='Otros intendentes' && r.category==='Intendente' && r.province.toLocaleLowerCase('es')!=='chubut') ||
+    r.category===universe
+  ),[data,universe]);
   const categories=useMemo(()=>[...new Set(universeRows.map(r=>r.category))].sort((a,b)=>a.localeCompare(b,'es')),[universeRows]);
   const scoped=useMemo(()=>universeRows.filter(r=>category==='Todas'||r.category===category),[universeRows,category]);
   const networks=useMemo(()=>[...new Set(scoped.map(r=>r.network))].sort(),[scoped]);
@@ -196,12 +213,12 @@ export default function EntityModule({universe,activeTab}:{universe:Universe;act
         <div className="flex justify-between gap-3 items-center text-sm font-semibold"><span>Seleccionar cuentas</span><span className="text-xs text-prosumia-gray">{roster.length} entidades · {selected.length} seleccionadas</span></div>
         <div className="flex items-start gap-3 overflow-x-auto pb-2">
           <button type="button" onClick={()=>setSelected([])} className={`shrink-0 w-[82px] text-center text-xs font-bold ${selected.length===0?'text-prosumia-dark':'text-prosumia-gray'}`}><span className={`mx-auto mb-1 flex w-14 h-14 items-center justify-center rounded-full border-2 ${selected.length===0?'border-prosumia-dark bg-white':'border-prosumia-gray-light bg-white'}`}>Todos</span>Todos</button>
-          {roster.map(item=><button type="button" key={item.id} onClick={()=>toggle(item.id)} title={`${item.name} · ${item.category}`} className={`shrink-0 w-[88px] text-center ${selected.length>0&&!selected.includes(item.id)?'opacity-40':''}`}><span className={`mx-auto mb-1 flex w-14 h-14 items-center justify-center rounded-full border-[3px] font-bold text-sm ${selected.includes(item.id)?'border-prosumia-red bg-white text-prosumia-dark':'border-white bg-white shadow-sm text-prosumia-gray'}`}>{initials(item.name)}</span><span className="block truncate text-[11px] font-semibold">{item.name}</span></button>)}
+          {roster.map(item=><button type="button" key={item.id} onClick={()=>toggle(item.id)} title={`${item.name} · ${item.category}`} className={`shrink-0 w-[88px] text-center ${selected.length>0&&!selected.includes(item.id)?'opacity-40':''}`}><span className={`mx-auto mb-1 flex w-14 h-14 items-center justify-center rounded-full border-[3px] font-bold text-sm ${selected.includes(item.id)?'border-prosumia-red bg-white text-prosumia-dark':'border-white bg-white shadow-sm text-prosumia-gray'}`}>{photoFor(item.category,item.name) ? <img src={photoFor(item.category,item.name)} alt="" className="w-full h-full rounded-full object-cover" onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=localInitialsAvatar(item.name);}}/> : initials(item.name)}</span><span className="block truncate text-[11px] font-semibold">{item.name}</span></button>)}
         </div>
         <p className="text-[11px] text-prosumia-gray">Las cuentas sin foto conservan su círculo y nombre. Una selección destaca las cuentas en las cinco columnas, sin eliminarlas del ranking.</p>
       </div>
       {activeTab==='ranking'&&<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 xl:gap-8">{METRICS.map(metric=><RankCard key={metric.key} metric={metric} entries={metricsEntries} selected={selected} onToggle={toggle}/>)}</div>}
-      {activeTab==='lectura'&&<EntityLectura entries={metricsEntries} previousRows={scopedNetwork} period={chosenPeriod} selected={selected} onToggle={toggle}/>}
+      {activeTab==='lectura'&&<EntityLectura entries={metricsEntries} previousRows={viewRows} period={chosenPeriod} selected={selected} onToggle={toggle}/>}
       {activeTab==='evolutivo'&&<EntityEvolutivo rows={viewRows} selected={selected} granularity={granularity} setGranularity={setGranularity} metric={evoMetric} setMetric={setEvoMetric} start={evoStart} setStart={setEvoStart} end={evoEnd} setEnd={setEvoEnd} nets={evoNets} setNets={setEvoNets} historical={historical} setHistorical={setHistorical} selectionMode={evoSelectionMode} setSelectionMode={setEvoSelectionMode} custom={evoCustom} setCustom={setEvoCustom}/>}
       {activeTab==='comparacion'&&<EntityComparacion rows={viewRows} period={chosenPeriod} selected={selected} onToggle={toggle} columns={compareCols} setColumns={setCompareCols}/>}
 
@@ -231,28 +248,65 @@ const infoBox='rounded-2xl border border-prosumia-gray-light bg-white p-5 shadow
 function EntityLectura({entries,previousRows,period,selected,onToggle}:{entries:Entry[];previousRows:Entry[];period:string;selected:string[];onToggle:(id:string)=>void}){
   const accounts=accountList(entries);
   const chosen=selected.length?accounts.filter(a=>selected.includes(a.id)):accounts.slice(0,1);
-  const historyPeriods=[...new Set(previousRows.map(periodId))].sort();
-  const prevId=historyPeriods[historyPeriods.indexOf(period)-1];
-  const prev=previousRows.filter(r=>periodId(r)===prevId);
+  const periods=[...new Set(previousRows.map(periodId))].sort();
+  const priorId=periods[periods.indexOf(period)-1];
+  const atPeriod=(id:string)=>previousRows.filter(r=>periodId(r)===id);
+  const currentAll=atPeriod(period), prevAll=priorId?atPeriod(priorId):[];
+  const networkStyle=(net:string)=>net==='FB'?'bg-[#1877F2]/5 border-[#1877F2]/20 text-[#1877F2]':net==='IG'?'bg-[#c13584]/5 border-[#c13584]/20 text-[#c13584]':net==='TT'||net==='TK'?'bg-black/5 border-black/10 text-black':'bg-gray-50 border-gray-200 text-gray-800';
   if(!chosen.length)return <div className={infoBox}>No hay cuentas con registros para el período y la plataforma seleccionados.</div>;
-  return <div className="space-y-5">
-    {chosen.length===1&&selected.length===0&&<p className="text-xs text-prosumia-gray">Lectura inicial de la primera cuenta con datos. Seleccioná círculos arriba para analizar las cuentas de tu interés.</p>}
+  return <div className="space-y-7">
+    {!selected.length&&<p className="text-xs text-prosumia-gray">Lectura de la primera cuenta con datos. Seleccioná cuentas en los círculos para ampliar el análisis.</p>}
     {chosen.map(a=>{
-      const fans=observed(entries,'Fans',a.id);
-      const pubs=observed(entries,'Publicaciones',a.id);
-      const reac=observed(entries,'Reacciones',a.id);
-      const prevFans=observed(prev,'Fans',a.id);
-      const engagement=pubs!==null&&reac!==null&&pubs>0?reac/pubs:null;
-      const growth=fans!==null&&prevFans!==null&&prevFans>0?(fans-prevFans)/prevFans*100:null;
-      return <div key={a.id} className={infoBox}>
-        <div className="flex items-center gap-3 mb-5"><div className="rounded-full w-14 h-14 bg-prosumia-gray-lighter border flex items-center justify-center font-bold">{initials(a.name)}</div><div><h3 className="font-poppins font-bold text-xl">{a.name}</h3><p className="text-xs text-prosumia-gray">{a.category} · {periodName(period)}</p></div></div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">{[
-          ['Seguidores',fans],['Publicaciones',pubs],['Reacciones',reac],['Engagement / Post',engagement],['Variación de seguidores (%)',growth]
-        ].map(([label,v])=><div key={String(label)} className="rounded-xl border border-prosumia-gray-light p-4"><p className="text-xs text-prosumia-gray">{label}</p><p className="font-bold text-xl mt-2">{metricValue(v as number|null)}</p></div>)}</div>
-        <p className="text-xs text-prosumia-gray mt-4">{fans===null?'No se dispone del número de seguidores para este corte. ':`La cuenta registra ${fmt(fans)} seguidores. `}{pubs===null?'Sin datos de publicaciones. ':`Se registran ${fmt(pubs)} publicaciones. `}{reac===null?'No hay dato de reacciones. ':`Las reacciones informadas alcanzan ${fmt(reac)}. `}{growth===null?'No hay una base mensual anterior comparable para calcular la variación de seguidores.':`La variación frente al mes anterior disponible es ${growth.toFixed(1).replace('.',',')}%.`}</p>
-      </div>;
+      const networkEntries=currentAll.filter(r=>keyOf(r)===a.id);
+      const networks=[...new Set(networkEntries.map(r=>r.network))].sort();
+      const summary=networks.map(net=>{
+        const now=networkEntries.filter(r=>r.network===net);
+        const past=prevAll.filter(r=>keyOf(r)===a.id&&r.network===net);
+        const fans=observed(now,'Fans',a.id),pubs=observed(now,'Publicaciones',a.id),reac=observed(now,'Reacciones',a.id);
+        const before=observed(past,'Fans',a.id);
+        return {net,fans,pubs,reac,eng:pubs!==null&&pubs>0&&reac!==null?reac/pubs:null,growth:fans!==null&&before!==null&&before>0?(fans-before)/before*100:null};
+      });
+      const total=(field:'pubs'|'reac')=>{const vals=summary.map(x=>x[field]).filter((v):v is number=>v!==null);return vals.length?vals.reduce((x,y)=>x+y,0):null;};
+      const pubs=total('pubs'),reac=total('reac');
+      const bestFans=summary.filter(x=>x.fans!==null).sort((x,y)=>(y.fans??0)-(x.fans??0))[0];
+      const bestEng=summary.filter(x=>x.eng!==null).sort((x,y)=>(y.eng??0)-(x.eng??0))[0];
+      const alerts:{title:string;text:string;type:'success'|'warning'|'info'}[]=[];
+      for(const r of summary){
+        if(r.growth!==null&&r.growth!==0)alerts.push({title:`Seguidores · ${r.net}`,text:`${r.growth>0?'Creció':'Disminuyó'} ${Math.abs(r.growth).toFixed(1).replace('.',',')}% respecto de ${priorId?periodName(priorId):'la medición anterior'}.`,type:r.growth>0?'success':'warning'});
+        const history=previousRows.filter(x=>keyOf(x)===a.id&&x.network===r.net&&x.metric==='Reacciones'&&periodId(x)<=period);
+        if(r.reac!==null&&history.length>1&&r.reac>0&&r.reac>=Math.max(...history.map(x=>x.value)))alerts.push({title:`Hito de reacciones · ${r.net}`,text:'Alcanzó el máximo de reacciones de los períodos disponibles para esta cuenta y red.',type:'info'});
+      }
+      const photo=photoFor(a.category,a.name);
+      return <section key={a.id} className="mb-12 border border-prosumia-gray-light rounded-2xl p-5 md:p-8 bg-white/50 backdrop-blur-md relative overflow-hidden">
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-prosumia-red-lighter blur-3xl opacity-20 pointer-events-none"/>
+        <div className="flex items-center gap-4 mb-6 relative z-10">
+          <div className="h-14 w-14 rounded-full border-4 border-white shadow-md overflow-hidden bg-prosumia-gray-lighter shrink-0 flex items-center justify-center font-bold">
+            {photo?<img src={photo} alt="" className="w-full h-full object-cover" onError={e=>{e.currentTarget.onerror=null;e.currentTarget.src=localInitialsAvatar(a.name);}}/>:initials(a.name)}
+          </div>
+          <div><h2 className="text-2xl font-poppins font-bold tracking-tight text-prosumia-dark">{a.name}</h2><span className="text-sm font-semibold text-prosumia-gray">Análisis de audiencia e interacciones · {a.category} · {periodName(period)}</span></div>
+        </div>
+        <div className="prose prose-red max-w-none font-sans text-prosumia-gray leading-relaxed space-y-4 mb-8 relative z-10">
+          <p className="text-lg">Durante <strong className="text-prosumia-dark">{periodName(period)}</strong>, {bestFans?<>su red de mayor audiencia registrada es <strong className="text-prosumia-dark">{bestFans.net}</strong>, con <strong className="text-prosumia-dark">{fmt(bestFans.fans!)}</strong> seguidores.</>:'no se dispone de datos de seguidores para las redes seleccionadas.'} {pubs!==null&&reac!==null?<>En las redes observadas publicó <strong className="text-prosumia-dark">{fmt(pubs)}</strong> contenidos que acumularon <strong className="text-prosumia-dark">{fmt(reac)}</strong> reacciones.</>: 'No hay información suficiente para totalizar publicaciones y reacciones.'}</p>
+          {bestEng&&<p className="text-lg">La mayor respuesta por publicación se registra en <strong className="text-prosumia-dark">{bestEng.net}</strong>, con <strong className="text-prosumia-dark">{fmt(bestEng.eng!)}</strong> reacciones por publicación. Este valor no representa una tasa porcentual.</p>}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+          {summary.map(r=><div key={r.net} className={`p-5 rounded-2xl border shadow-sm ${networkStyle(r.net)} ${bestEng?.net===r.net?'ring-2 ring-current ring-offset-2':''}`}>
+            <div className="text-sm font-black mb-3 tracking-widest uppercase">{r.net==='TW'?'X':r.net}</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider opacity-70">Seguidores</div><div className="text-lg font-bold">{metricValue(r.fans)}</div>
+            <div className="mt-3 text-[11px] font-bold uppercase tracking-wider opacity-70">Reacciones / publicación</div><div className="text-lg font-bold">{metricValue(r.eng)}</div>
+            <div className="mt-3 text-xs">{metricValue(r.pubs)} publicaciones · {metricValue(r.reac)} reacciones</div>
+          </div>)}
+        </div>
+        {alerts.length>0&&<div className="mt-8 space-y-4">
+          <h3 className="text-lg font-poppins font-bold text-prosumia-dark flex items-center gap-2"><Activity className="w-5 h-5 text-prosumia-red"/> Evolución y alertas (mensual)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{alerts.map((alert,i)=><div key={i} className={`p-4 rounded-xl border flex gap-3 items-start ${alert.type==='warning'?'bg-red-50/50 border-red-200':alert.type==='success'?'bg-green-50/50 border-green-200':'bg-blue-50/50 border-blue-200'}`}>
+            {alert.type==='warning'?<TrendingDown className="w-5 h-5 text-red-600 shrink-0"/>:alert.type==='success'?<TrendingUp className="w-5 h-5 text-green-700 shrink-0"/>:<BarChart2 className="w-5 h-5 text-blue-700 shrink-0"/>}
+            <div><h4 className="font-bold text-sm">{alert.title}</h4><p className="text-xs leading-relaxed mt-1">{alert.text}</p></div>
+          </div>)}</div>
+        </div>}
+        {!alerts.length&&<p className="mt-6 text-xs text-prosumia-gray">No se identificaron cambios comparables ni hitos para este corte; no se imputaron valores ausentes.</p>}
+      </section>;
     })}
-    {chosen.length>1&&<div className={infoBox}><h3 className="font-bold mb-3">Análisis comparativo directo</h3><p className="text-xs text-prosumia-gray mb-3">Solo se comparan observaciones efectivamente disponibles para la misma red y el mismo período.</p><div className="overflow-auto"><table className="min-w-full text-sm"><thead><tr className="text-left border-b"><th className="py-2">Cuenta</th>{['Fans','Publicaciones','Reacciones','Comentarios'].map(m=><th key={m}>{m}</th>)}</tr></thead><tbody>{chosen.map(a=><tr key={a.id} className="border-b"><td className="py-2 font-semibold">{a.name}</td>{['Fans','Publicaciones','Reacciones','Comentarios'].map(m=><td key={m}>{metricValue(observed(entries,m,a.id))}</td>)}</tr>)}</tbody></table></div></div>}
   </div>;
 }
 
