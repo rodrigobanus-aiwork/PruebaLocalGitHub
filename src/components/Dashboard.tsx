@@ -103,7 +103,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   
   // Universo de análisis. Los módulos nuevos son maquetas sin datos.
-  const [universe, setUniverse] = useState<"gobernadores" | "dirigentes" | "medios" | "comparador">("gobernadores");
+  const [universe, setUniverse] = useState<"gobernadores" | "Detractor" | "Municipio" | "Intendente" | "Ministro provincial" | "Ministerio provincial" | "Figuras nacionales" | "Influencer correntino" | "comparador">("gobernadores");
 
   // Tabs
   const [activeTab, setActiveTab] = useState<"ranking" | "lectura" | "evolutivo" | "comparacion">("ranking");
@@ -358,7 +358,7 @@ export default function Dashboard() {
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Analytics Logo" className="w-11 h-11 object-contain shrink-0 rounded-xl shadow-sm" />
               <div>
                 <h1 className="font-poppins text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-prosumia-dark to-prosumia-gray tracking-tight leading-none">
-                  {universe === "gobernadores" ? "Ranking de Gobernadores" : universe === "dirigentes" ? "Dirigentes" : universe === "medios" ? "Medios" : "Comparador"}
+                  {universe === "gobernadores" ? "Ranking de Gobernadores" : universe === "comparador" ? "Comparador" : universe}
                 </h1>
                 <span className="text-[10px] uppercase font-bold text-prosumia-gray/70 tracking-widest block mt-0.5 mb-1.5">powered by analytics</span>
                 <div className="flex items-center gap-3 text-xs text-prosumia-gray font-medium font-sans">
@@ -514,10 +514,15 @@ export default function Dashboard() {
       <main className="max-w-[1600px] mx-auto px-6 mt-8 relative min-h-[60vh]">
         <div className="flex flex-wrap gap-2 mb-7 border-b border-prosumia-gray-light pb-5" aria-label="Universos de análisis">
           {([
-            {id: "gobernadores", text: "Gobernadores", sub: "Provinciales"},
-            {id: "dirigentes", text: "Dirigentes", sub: "Personas públicas"},
-            {id: "medios", text: "Medios", sub: "Cuentas digitales"},
-            {id: "comparador", text: "Comparador", sub: "Entre universos"}
+            {id: "gobernadores", text: "Gobernadores y Gobiernos", sub: "Provinciales"},
+            {id: "Detractor", text: "Detractor", sub: "Categoría original"},
+            {id: "Municipio", text: "Municipio", sub: "Categoría original"},
+            {id: "Intendente", text: "Intendente", sub: "Categoría original"},
+            {id: "Ministro provincial", text: "Ministro provincial", sub: "Categoría original"},
+            {id: "Ministerio provincial", text: "Ministerio provincial", sub: "Categoría original"},
+            {id: "Figuras nacionales", text: "Figuras nacionales", sub: "Categoría original"},
+            {id: "Influencer correntino", text: "Influencer correntino", sub: "Categoría original"},
+            {id: "comparador", text: "Comparador", sub: "Entre categorías"}
           ] as const).map(item => (
             <button key={item.id} type="button" onClick={() => setUniverse(item.id)}
               className={cn("flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all border min-w-[175px]",
@@ -528,7 +533,7 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-        {universe !== "gobernadores" && <EntityModule universe={universe} activeTab={activeTab} />}
+        {universe !== "gobernadores" && <EntityModule key={universe} universe={universe} activeTab={activeTab} />}
         {universe === "gobernadores" && <>
         {/* Governor Highlight Selector */}
         {visibleGovernors.length > 0 && (

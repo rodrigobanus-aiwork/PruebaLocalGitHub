@@ -15,7 +15,7 @@ import { Users, FileText, Heart, MessageCircle, Activity, TrendingUp } from 'luc
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { RankingCard, ProgressBar, getTrafficLightColor } from './Dashboard';
 
-export type Universe = 'dirigentes' | 'medios' | 'comparador';
+export type Universe = 'Detractor' | 'Municipio' | 'Intendente' | 'Ministro provincial' | 'Ministerio provincial' | 'Figuras nacionales' | 'Influencer correntino' | 'comparador';
 export type AnalysisTab = 'ranking' | 'lectura' | 'evolutivo' | 'comparacion';
 type Entry = {
   year: number; month: number; network: string; entity: string;
@@ -159,7 +159,7 @@ export default function EntityModule({universe,activeTab}:{universe:Universe;act
     request.then(raw=>{if(alive)setData(parseCSV(raw));}).catch(e=>{if(alive)setError(String(e.message||e));}).finally(()=>{if(alive)setLoading(false);});
     return()=>{alive=false;};
   },[]);
-  const universeRows=useMemo(()=>data.filter(r=>universe==='comparador'||(universe==='medios'?r.category==='Detractor':r.category!=='Detractor')),[data,universe]);
+  const universeRows=useMemo(()=>data.filter(r=>universe==='comparador'||r.category===universe),[data,universe]);
   const categories=useMemo(()=>[...new Set(universeRows.map(r=>r.category))].sort((a,b)=>a.localeCompare(b,'es')),[universeRows]);
   const scoped=useMemo(()=>universeRows.filter(r=>category==='Todas'||r.category===category),[universeRows,category]);
   const networks=useMemo(()=>[...new Set(scoped.map(r=>r.network))].sort(),[scoped]);
@@ -179,11 +179,11 @@ export default function EntityModule({universe,activeTab}:{universe:Universe;act
   const metricsEntries=useMemo(()=>entries.filter(r=>!search||r.entity.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es'))),[entries,search]);
   const universePeriods=useMemo(()=>[...new Set(scoped.filter(r=>province==='Todas'||r.province===province).map(periodId))].sort(),[scoped,province]);
   const viewRows=useMemo(()=>scoped.filter(r=>province==='Todas'||r.province===province),[scoped,province]);
-  const title=universe==='medios'?'Medios y cuentas digitales':universe==='comparador'?'Comparador transversal':'Dirigentes y organismos';
+  const title=universe==='comparador'?'Comparador transversal':universe;
   return <section className="space-y-6 pb-12">
     <div><p className="uppercase font-bold tracking-widest text-[10px] text-prosumia-red mb-1">PROSUMIA · NUEVAS ENTIDADES</p><h2 className="font-poppins text-2xl font-bold">{title}</h2><p className="text-sm text-prosumia-gray mt-1">{activeTab === 'ranking'?'Ranking':activeTab === 'lectura'?'Lectura':activeTab === 'evolutivo'?'Evolutivo':'Comparación'} por categoría y plataforma · registros originales sin imputaciones</p></div>
     <div className="flex flex-wrap gap-3 rounded-2xl bg-prosumia-gray-lighter p-3 items-center">
-      <label className="flex flex-col gap-1 text-[11px] text-prosumia-gray">Categoría<select aria-label="Categoría" className={selectClass} value={category} onChange={e=>{setCategory(e.target.value);setPeriod('');setSelected([]);}}><option value="Todas">Todas las categorías</option>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
+      {universe==='comparador'&&<label className="flex flex-col gap-1 text-[11px] text-prosumia-gray">Categoría<select aria-label="Categoría" className={selectClass} value={category} onChange={e=>{setCategory(e.target.value);setPeriod('');setSelected([]);}}><option value="Todas">Todas las categorías</option>{categories.map(c=><option key={c}>{c}</option>)}</select></label>}
       {activeTab!=='comparacion'&&<label className="flex flex-col gap-1 text-[11px] text-prosumia-gray">Red social<select aria-label="Red social" className={selectClass} value={effectiveNetwork} onChange={e=>{setNetwork(e.target.value);setPeriod('');setSelected([]);}}>{networks.map(n=><option key={n} value={n}>{n}</option>)}</select></label>}
       <label className="flex flex-col gap-1 text-[11px] text-prosumia-gray">Provincia<select aria-label="Provincia" className={selectClass} value={province} onChange={e=>{setProvince(e.target.value);setPeriod('');setSelected([]);}}><option value="Todas">Todas las provincias</option>{provinces.map(p=><option key={p}>{p}</option>)}</select></label>
       <label className="flex flex-col gap-1 text-[11px] text-prosumia-gray">Mes<select aria-label="Mes" className={selectClass} value={chosenPeriod} onChange={e=>setPeriod(e.target.value)}>{periods.map(p=><option key={p} value={p}>{periodName(p)}</option>)}</select></label>

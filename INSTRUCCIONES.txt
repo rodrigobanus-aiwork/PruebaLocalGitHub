@@ -1,0 +1,28 @@
+PROSUMIA - PESTANAS POR CATEGORIA ORIGINAL
+
+Archivos a reemplazar en rama EXPERIMENTAL de PruebaLocalGitHub:
+  src/components/Dashboard.tsx
+  src/components/EntityModule.tsx
+  public/mega_metricas.csv
+
+Pestanas superiores:
+ Gobernadores y Gobiernos (base y vistas originales sin modificar)
+ Detractor
+ Municipio
+ Intendente
+ Ministro provincial
+ Ministerio provincial
+ Figuras nacionales
+ Influencer correntino
+ Comparador (categorias combinadas)
+
+Cada pestaña usa las cuatro opciones analiticas existentes:
+ Ranking / Lectura / Evolutivo / Comparacion.
+
+Los datos de la pestaña provienen exclusivamente de su Categoria original
+registrada en CSV; el comparador permite filtrar por categoria.
+El CSV actualizado incluye 14.047 filas y 5.544 observaciones de Influencer correntino.
+
+CONTROLES: parser TypeScript TSX y nombres de categoria validos; NO se realizo
+compilacion completa de Vite ni prueba en navegador.
+La dependencia circular existente Dashboard <-> EntityModule sigue pendiente.
